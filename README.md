@@ -26,6 +26,7 @@ Atlas doesn't just answer — it **plans, calls tools, looks at the results, and
 | `local_agent.py` | Free agent using a local model via Ollama |
 | `tools.py` | The tools Claude can use (each is a plain Python function) |
 | `main.py`  | Command-line chat interface |
+| `web.py` + `static/index.html` | Chat webpage at http://localhost:8000 |
 
 ### Built-in tools
 
@@ -65,6 +66,16 @@ ollama pull qwen2.5:3b
 Optional: to use Claude instead, run `./add_key.sh` and paste a key from console.anthropic.com.
 
 ## Run it
+
+### In your browser
+
+```bash
+./run_web.sh
+```
+
+Then open **http://localhost:8000**. Each reply shows which tools the bot used.
+
+### In the terminal
 
 ```bash
 ./run.sh

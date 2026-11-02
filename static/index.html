@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atlas</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --text: #1b1f24;
+    --muted: #6b7380;
+    --border: #e3e6eb;
+    --accent: #3d63dd;
+    --accent-text: #ffffff;
+    --user-bubble: #3d63dd;
+    --bot-bubble: #ffffff;
+    --chip: #eef1f6;
+    --code: #f0f2f5;
+    --error: #c2362b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111317;
+      --panel: #181b20;
+      --text: #e7e9ec;
+      --muted: #8b93a0;
+      --border: #2a2f37;
+      --accent: #6d8cf0;
+      --accent-text: #0d1017;
+      --user-bubble: #3d5bc4;
+      --bot-bubble: #1e2228;
+      --chip: #242931;
+      --code: #262b33;
+      --error: #f0786d;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  .logo {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: var(--accent); color: var(--accent-text);
+    display: grid; place-items: center; font-weight: 700;
+  }
+  .title { font-weight: 650; font-size: 16px; }
+  .mode { font-size: 12px; color: var(--muted); }
+  header button { margin-left: auto; }
+
+  button {
+    font: inherit; font-size: 14px;
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+    padding: 7px 12px; border-radius: 8px; cursor: pointer;
+  }
+  button:hover { border-color: var(--muted); }
+
+  main { flex: 1; overflow-y: auto; }
+  #messages {
+    max-width: 760px; margin: 0 auto; padding: 24px 16px 12px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+
+  .welcome { text-align: center; padding: 40px 0 8px; }
+  .welcome h1 { font-size: 24px; margin: 0 0 6px; }
+  .welcome p { color: var(--muted); margin: 0 0 20px; }
+  .suggestions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .suggestions button { border-radius: 999px; font-size: 13.5px; }
+
+  .msg { display: flex; flex-direction: column; max-width: 85%; }
+  .msg.user { align-self: flex-end; align-items: flex-end; }
+  .msg.bot { align-self: flex-start; }
+  .bubble {
+    padding: 10px 14px; border-radius: 14px; overflow-wrap: anywhere;
+  }
+  .user .bubble { background: var(--user-bubble); color: #fff; border-bottom-right-radius: 4px; white-space: pre-wrap; }
+  .bot .bubble { background: var(--bot-bubble); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+  .bot .bubble p { margin: 0 0 8px; }
+  .bot .bubble p:last-child { margin-bottom: 0; }
+  .bot .bubble ul, .bot .bubble ol { margin: 4px 0 8px; padding-left: 22px; }
+  .bot .bubble code { background: var(--code); padding: 1px 5px; border-radius: 4px; font-size: 13.5px; }
+  .bot .bubble pre { background: var(--code); padding: 10px; border-radius: 8px; overflow-x: auto; }
+  .bot .bubble pre code { background: none; padding: 0; }
+  .error .bubble { color: var(--error); }
+
+  .tools { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+  .tool {
+    font-size: 12px; color: var(--muted); background: var(--chip);
+    padding: 3px 9px; border-radius: 999px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .typing { display: inline-flex; gap: 4px; padding: 14px 16px; }
+  .typing span {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--muted);
+    animation: blink 1.2s infinite ease-in-out;
+  }
+  .typing span:nth-child(2) { animation-delay: .15s; }
+  .typing span:nth-child(3) { animation-delay: .3s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+
+  footer { background: var(--bg); padding: 8px 16px 16px; }
+  form {
+    max-width: 760px; margin: 0 auto; display: flex; gap: 8px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 8px;
+  }
+  form:focus-within { border-color: var(--accent); }
+  textarea {
+    flex: 1; resize: none; border: 0; outline: 0; background: transparent; color: var(--text);
+    font: inherit; padding: 6px 8px; max-height: 160px;
+  }
+  form button { background: var(--accent); color: var(--accent-text); border: 0; font-weight: 600; padding: 8px 16px; }
+  form button:disabled { opacity: .5; cursor: default; }
+  .hint { max-width: 760px; margin: 6px auto 0; font-size: 12px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">A</div>
+  <div>
+    <div class="title">Atlas</div>
+    <div class="mode" id="mode">connecting…</div>
+  </div>
+  <button id="reset" type="button">New chat</button>
+</header>
+
+<main id="scroller">
+  <div id="messages">
+    <div class="welcome" id="welcome">
+      <h1>Hi, I'm Atlas</h1>
+      <p>An AI agent that uses tools to get things done.</p>
+      <div class="suggestions">
+        <button>What's the weather in Hyderabad?</button>
+        <button>Tell me about the Eiffel Tower</button>
+        <button>What's 18% of 2,340?</button>
+        <button>What time is it in New York?</button>
+        <button>My name is Sam, remember that</button>
+        <button>Write a shopping list to list.md</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <form id="form">
+    <textarea id="input" rows="1" placeholder="Message Atlas…" autofocus></textarea>
+    <button id="send" type="submit">Send</button>
+  </form>
+  <div class="hint">Enter to send · Shift+Enter for a new line</div>
+</footer>
+
+<script>
+  const messages = document.getElementById("messages");
+  const scroller = document.getElementById("scroller");
+  const input = document.getElementById("input");
+  const send = document.getElementById("send");
+  let session = crypto.randomUUID();
+  let busy = false;
+
+  fetch("/api/info").then(r => r.json()).then(d => {
+    document.getElementById("mode").textContent = d.mode;
+  }).catch(() => {
+    document.getElementById("mode").textContent = "server not running";
+  });
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  // Small, safe markdown: code blocks, inline code, bold, italics, lists, paragraphs.
+  function renderMarkdown(text) {
+    const blocks = [];
+    text = text.replace(/```\w*\n?([\s\S]*?)```/g, (_, code) => {
+      blocks.push(`<pre><code>${escapeHtml(code.trimEnd())}</code></pre>`);
+      return `\u0000${blocks.length - 1}\u0000`;
+    });
+    const inline = s => escapeHtml(s)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/(^|\W)\*([^*\n]+)\*(?=\W|$)/g, "$1<em>$2</em>");
+    return text.split(/\n{2,}/).map(chunk => {
+      const lines = chunk.split("\n");
+      const m = chunk.trim().match(/^\u0000(\d+)\u0000$/);
+      if (m) return blocks[+m[1]];
+      if (lines.every(l => /^\s*[-*•]\s+/.test(l)))
+        return "<ul>" + lines.map(l => `<li>${inline(l.replace(/^\s*[-*•]\s+/, ""))}</li>`).join("") + "</ul>";
+      if (lines.every(l => /^\s*\d+[.)]\s+/.test(l)))
+        return "<ol>" + lines.map(l => `<li>${inline(l.replace(/^\s*\d+[.)]\s+/, ""))}</li>`).join("") + "</ol>";
+      return `<p>${lines.map(inline).join("<br>")}</p>`;
+    }).join("").replace(/\u0000(\d+)\u0000/g, (_, i) => blocks[+i]);
+  }
+
+  function addMessage(role, html, tools = []) {
+    document.getElementById("welcome")?.remove();
+    const msg = document.createElement("div");
+    msg.className = `msg ${role}`;
+    if (tools.length) {
+      const row = document.createElement("div");
+      row.className = "tools";
+      for (const t of tools) {
+        const chip = document.createElement("span");
+        chip.className = "tool";
+        const args = Object.values(t.args || {}).map(v => JSON.stringify(v)).join(", ");
+        chip.textContent = `⚙ ${t.name}(${args})`;
+        chip.title = chip.textContent;
+        row.appendChild(chip);
+      }
+      msg.appendChild(row);
+    }
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.innerHTML = html;
+    msg.appendChild(bubble);
+    messages.appendChild(msg);
+    scroller.scrollTop = scroller.scrollHeight;
+    return msg;
+  }
+
+  async function ask(text) {
+    if (busy || !text.trim()) return;
+    busy = true; send.disabled = true;
+    addMessage("user", escapeHtml(text));
+    input.value = ""; autosize();
+    const typing = addMessage("bot", '<div class="typing"><span></span><span></span><span></span></div>');
+    typing.querySelector(".bubble").style.padding = "0";
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({message: text, session}),
+      });
+      const data = await res.json();
+      typing.remove();
+      if (data.error) addMessage("bot error", escapeHtml(data.error));
+      else addMessage("bot", renderMarkdown(data.answer), data.tools);
+    } catch {
+      typing.remove();
+      addMessage("bot error", "Can't reach the Atlas server. Is ./run_web.sh still running?");
+    }
+    busy = false; send.disabled = false; input.focus();
+  }
+
+  function autosize() {
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 160) + "px";
+  }
+
+  document.getElementById("form").addEventListener("submit", e => { e.preventDefault(); ask(input.value); });
+  input.addEventListener("input", autosize);
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(input.value); }
+  });
+  document.querySelectorAll(".suggestions button").forEach(b => b.addEventListener("click", () => ask(b.textContent)));
+  document.getElementById("reset").addEventListener("click", async () => {
+    await fetch("/api/reset", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({session})}).catch(() => {});
+    location.reload();
+  });
+</script>
+</body>
+</html>
