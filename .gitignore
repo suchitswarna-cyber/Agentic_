@@ -1,0 +1,5 @@
+workspace/
+memory.json
+.venv/
+__pycache__/
+.env
