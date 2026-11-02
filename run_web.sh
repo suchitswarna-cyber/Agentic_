@@ -1,5 +1,5 @@
 #!/bin/bash
-# Starts the Atlas web page at http://localhost:8000
+# Starts the SSC web page at http://localhost:8000
 # Uses Claude if you've saved an API key (./add_key.sh), otherwise the free local model.
 cd "$(dirname "$0")"
 source .venv/bin/activate

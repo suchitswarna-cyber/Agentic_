@@ -1,4 +1,4 @@
-"""Web page for chatting with Atlas.
+"""Web page for chatting with SSC.
 
 Usage:
     ./run_web.sh           # then open http://localhost:8000
@@ -77,5 +77,5 @@ def reset():
 
 
 if __name__ == "__main__":
-    print(f"Atlas web ({MODE}) running at http://localhost:8000")
+    print(f"SSC web ({MODE}) running at http://localhost:8000")
     app.run(host="127.0.0.1", port=8000, threaded=True)

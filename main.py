@@ -43,7 +43,7 @@ def log_tool(name, tool_input):
 def ask(agent, prompt: str):
     thinking()
     try:
-        print(f"{CLEAR_LINE}{GREEN}Atlas:{RESET} {agent.chat(prompt)}\n")
+        print(f"{CLEAR_LINE}{GREEN}SSC:{RESET} {agent.chat(prompt)}\n")
     except KeyboardInterrupt:
         print(f"{CLEAR_LINE}(stopped)\n")
     except ConnectionError:
@@ -59,7 +59,7 @@ def ask(agent, prompt: str):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Atlas - an agentic AI bot")
+    parser = argparse.ArgumentParser(description="SSC - an agentic AI bot")
     parser.add_argument("task", nargs="?", help="Run one task and exit")
     parser.add_argument("--effort", default="high",
                         choices=["low", "medium", "high", "xhigh", "max"],
@@ -78,7 +78,7 @@ def main():
         ask(agent, args.task)
         return
 
-    print(f"{CYAN}Atlas agent ready ({mode}).{RESET} Type /help for ideas.\n")
+    print(f"{CYAN}SSC agent ready ({mode}).{RESET} Type /help for ideas.\n")
     while True:
         try:
             user = input(f"{CYAN}You:{RESET} ").strip()

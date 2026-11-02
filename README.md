@@ -1,7 +1,7 @@
-# Atlas — an agentic AI bot
+# SSC — an agentic AI bot
 
 A small, readable agentic AI project built on Claude (`claude-opus-5-5`).
-Atlas doesn't just answer — it **plans, calls tools, looks at the results, and keeps going** until the task is done.
+SSC doesn't just answer — it **plans, calls tools, looks at the results, and keeps going** until the task is done.
 
 ## How it works
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Atlas</title>
+<title>SSC</title>
 <style>
   :root {
     --bg: #f6f7f9;
@@ -131,9 +131,9 @@
 </head>
 <body>
 <header>
-  <div class="logo">A</div>
+  <div class="logo">S</div>
   <div>
-    <div class="title">Atlas</div>
+    <div class="title">SSC</div>
     <div class="mode" id="mode">connecting…</div>
   </div>
   <button id="reset" type="button">New chat</button>
@@ -142,7 +142,7 @@
 <main id="scroller">
   <div id="messages">
     <div class="welcome" id="welcome">
-      <h1>Hi, I'm Atlas</h1>
+      <h1>Hi, I'm SSC</h1>
       <p>An AI agent that uses tools to get things done.</p>
       <div class="suggestions">
         <button>What's the weather in Hyderabad?</button>
@@ -158,7 +158,7 @@
 
 <footer>
   <form id="form">
-    <textarea id="input" rows="1" placeholder="Message Atlas…" autofocus></textarea>
+    <textarea id="input" rows="1" placeholder="Message SSC…" autofocus></textarea>
     <button id="send" type="submit">Send</button>
   </form>
   <div class="hint">Enter to send · Shift+Enter for a new line</div>
@@ -251,7 +251,7 @@
       else addMessage("bot", renderMarkdown(data.answer), data.tools);
     } catch {
       typing.remove();
-      addMessage("bot error", "Can't reach the Atlas server. Is ./run_web.sh still running?");
+      addMessage("bot error", "Can't reach the SSC server. Is ./run_web.sh still running?");
     }
     busy = false; send.disabled = false; input.focus();
   }

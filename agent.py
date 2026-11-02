@@ -12,7 +12,7 @@ from tools import ALL_TOOLS
 
 MODEL = "claude-opus-5-5"
 
-SYSTEM_PROMPT = """You are Atlas, a helpful autonomous assistant.
+SYSTEM_PROMPT = """You are SSC, a helpful autonomous assistant.
 
 Work through tasks step by step. Use your tools whenever they help:
 - calculator for any arithmetic

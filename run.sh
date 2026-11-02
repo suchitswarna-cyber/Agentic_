@@ -1,5 +1,5 @@
 #!/bin/bash
-# Starts Atlas from any folder.
+# Starts SSC from any folder.
 # Uses Claude if you've saved an API key (./add_key.sh), otherwise the free local model.
 cd "$(dirname "$0")"
 source .venv/bin/activate

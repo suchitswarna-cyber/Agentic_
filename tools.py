@@ -87,7 +87,7 @@ def get_current_time(timezone: str = "UTC") -> str:
 def _get_json(url: str, params: dict) -> dict:
     request = urllib.request.Request(
         f"{url}?{urllib.parse.urlencode(params)}",
-        headers={"User-Agent": "AtlasBot/1.0 (github.com/suchitswarna-cyber/Agentic_)"},
+        headers={"User-Agent": "SSCBot/1.0 (github.com/suchitswarna-cyber/Agentic_)"},
     )
     with urllib.request.urlopen(request, timeout=10) as response:
         return json.loads(response.read())

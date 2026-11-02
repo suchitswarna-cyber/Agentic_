@@ -12,7 +12,8 @@ from tools import LOCAL_TOOLS
 MODEL = "qwen2.5:3b"
 MAX_STEPS = 8  # stop runaway tool loops
 
-SYSTEM_PROMPT = """You are Atlas, a helpful assistant running locally.
+SYSTEM_PROMPT = """Your name is SSC. You are a helpful assistant running locally.
+When someone asks who you are, introduce yourself as SSC.
 
 You have tools. Use one only when it is needed:
 - calculator: any arithmetic
