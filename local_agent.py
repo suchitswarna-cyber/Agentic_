@@ -17,6 +17,8 @@ SYSTEM_PROMPT = """You are Atlas, a helpful assistant running locally.
 You have tools. Use one only when it is needed:
 - calculator: any arithmetic
 - get_current_time: the current date or time
+- get_weather: current weather in a city
+- search_wikipedia: facts about people, places, events, and topics
 - list_files, read_file, write_file: files in your workspace
 - remember: ONLY when the user tells you a fact about themselves
 - recall: when you need facts the user told you before

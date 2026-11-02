@@ -8,6 +8,8 @@ function when Claude asks for it.
 import ast
 import json
 import operator
+import urllib.parse
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -78,6 +80,79 @@ def get_current_time(timezone: str = "UTC") -> str:
         return datetime.now(ZoneInfo(timezone)).strftime("%A, %Y-%m-%d %H:%M:%S %Z")
     except ZoneInfoNotFoundError:
         return f"Error: unknown timezone '{timezone}'"
+
+
+# --- Weather and Wikipedia (free public APIs, no key needed) ----------------
+
+def _get_json(url: str, params: dict) -> dict:
+    request = urllib.request.Request(
+        f"{url}?{urllib.parse.urlencode(params)}",
+        headers={"User-Agent": "AtlasBot/1.0 (github.com/suchitswarna-cyber/Agentic_)"},
+    )
+    with urllib.request.urlopen(request, timeout=10) as response:
+        return json.loads(response.read())
+
+
+# Open-Meteo weather codes -> plain words
+_WEATHER = {
+    0: "clear sky", 1: "mainly clear", 2: "partly cloudy", 3: "overcast",
+    45: "fog", 48: "fog", 51: "light drizzle", 53: "drizzle", 55: "heavy drizzle",
+    61: "light rain", 63: "rain", 65: "heavy rain", 71: "light snow", 73: "snow",
+    75: "heavy snow", 80: "rain showers", 81: "rain showers", 82: "heavy showers",
+    95: "thunderstorm", 96: "thunderstorm with hail", 99: "thunderstorm with hail",
+}
+
+
+@beta_tool
+def get_weather(city: str) -> str:
+    """Get the current weather for a city.
+
+    Args:
+        city: City name, e.g. "London" or "Hyderabad".
+    """
+    try:
+        places = _get_json("https://geocoding-api.open-meteo.com/v1/search",
+                           {"name": city, "count": 1}).get("results")
+        if not places:
+            return f"Error: couldn't find a city called '{city}'"
+        place = places[0]
+        now = _get_json("https://api.open-meteo.com/v1/forecast", {
+            "latitude": place["latitude"],
+            "longitude": place["longitude"],
+            "current": "temperature_2m,apparent_temperature,relative_humidity_2m,"
+                       "wind_speed_10m,weather_code",
+        })["current"]
+        return (
+            f"{place['name']}, {place.get('country', '')}: "
+            f"{_WEATHER.get(now['weather_code'], 'unknown conditions')}, "
+            f"{now['temperature_2m']}°C (feels like {now['apparent_temperature']}°C), "
+            f"humidity {now['relative_humidity_2m']}%, wind {now['wind_speed_10m']} km/h"
+        )
+    except Exception as e:
+        return f"Error: {e}"
+
+
+@beta_tool
+def search_wikipedia(query: str) -> str:
+    """Look up a topic on Wikipedia and return a short summary. Use for facts about people, places, events, and concepts.
+
+    Args:
+        query: What to look up, e.g. "Alan Turing" or "photosynthesis".
+    """
+    try:
+        hits = _get_json("https://en.wikipedia.org/w/api.php", {
+            "action": "query", "list": "search", "srsearch": query,
+            "format": "json", "srlimit": 1,
+        })["query"]["search"]
+        if not hits:
+            return f"No Wikipedia article found for '{query}'"
+        title = hits[0]["title"]
+        summary = _get_json(
+            "https://en.wikipedia.org/api/rest_v1/page/summary/"
+            + urllib.parse.quote(title.replace(" ", "_")), {})
+        return f"{title}: {summary.get('extract', '(no summary)')}"
+    except Exception as e:
+        return f"Error: {e}"
 
 
 # --- Files (sandboxed to ./workspace) ---------------------------------------
@@ -155,6 +230,8 @@ WEB_SEARCH = {"type": "web_search_20260209", "name": "web_search", "max_uses": 5
 LOCAL_TOOLS = [
     calculator,
     get_current_time,
+    get_weather,
+    search_wikipedia,
     list_files,
     read_file,
     write_file,

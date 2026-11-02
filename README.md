@@ -33,6 +33,8 @@ Atlas doesn't just answer — it **plans, calls tools, looks at the results, and
 |---|---|
 | `calculator` | Exact arithmetic (safe parser, no `eval`) |
 | `get_current_time` | Current date/time in any timezone |
+| `get_weather` | Live weather for any city (Open-Meteo, free) |
+| `search_wikipedia` | Wikipedia summaries for facts and topics |
 | `web_search` | Live web search (Claude mode only) |
 | `list_files` / `read_file` / `write_file` | File access, sandboxed to `./workspace` |
 | `remember` / `recall` | Long-term memory saved to `memory.json`, kept across runs |
@@ -84,7 +86,7 @@ Try prompts that need several steps:
 - "Write a study plan for learning agentic AI to plan.md, then read it back to me."
 
 Use `--effort low` for faster, cheaper answers or `--effort xhigh` for harder tasks.
-Chat commands: `/reset` clears the conversation, `/quit` exits.
+Chat commands: `/help` shows ideas, `/reset` clears the conversation, `/quit` exits.
 
 ## Add your own tool
 

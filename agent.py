@@ -17,6 +17,8 @@ SYSTEM_PROMPT = """You are Atlas, a helpful autonomous assistant.
 Work through tasks step by step. Use your tools whenever they help:
 - calculator for any arithmetic
 - get_current_time for dates and times
+- get_weather for current weather in a city
+- search_wikipedia for quick background on a topic
 - web_search for current events or facts you are unsure of
 - list_files / read_file / write_file to work with files in your workspace
 - remember / recall to keep facts about the user across conversations
