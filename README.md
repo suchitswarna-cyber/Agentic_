@@ -22,7 +22,8 @@ Atlas doesn't just answer — it **plans, calls tools, looks at the results, and
 
 | File | Role |
 |---|---|
-| `agent.py` | The agent: model, system prompt, conversation history, the loop |
+| `agent.py` | Claude agent: model, system prompt, conversation history, the loop |
+| `local_agent.py` | Free agent using a local model via Ollama |
 | `tools.py` | The tools Claude can use (each is a plain Python function) |
 | `main.py`  | Command-line chat interface |
 
@@ -32,9 +33,18 @@ Atlas doesn't just answer — it **plans, calls tools, looks at the results, and
 |---|---|
 | `calculator` | Exact arithmetic (safe parser, no `eval`) |
 | `get_current_time` | Current date/time in any timezone |
-| `web_search` | Live web search (runs on Anthropic's servers) |
+| `web_search` | Live web search (Claude mode only) |
 | `list_files` / `read_file` / `write_file` | File access, sandboxed to `./workspace` |
 | `remember` / `recall` | Long-term memory saved to `memory.json`, kept across runs |
+
+## Two ways to run it
+
+| Mode | Brain | Cost | Web search |
+|---|---|---|---|
+| **Free (default)** | `qwen2.5:3b` running on your Mac via [Ollama](https://ollama.com) | Free, offline | No |
+| **Claude** | `claude-opus-5-5` | Pay-per-use API key | Yes |
+
+The bot uses Claude when an API key is saved, otherwise the free local model.
 
 ## Setup
 
@@ -42,20 +52,29 @@ Atlas doesn't just answer — it **plans, calls tools, looks at the results, and
 cd agentic-bot
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-export ANTHROPIC_API_KEY=sk-ant-...   # get one at console.anthropic.com
 ```
+
+For free mode, install [Ollama](https://ollama.com/download) and download the model once:
+
+```bash
+ollama pull qwen2.5:3b
+```
+
+Optional: to use Claude instead, run `./add_key.sh` and paste a key from console.anthropic.com.
 
 ## Run it
 
 ```bash
-python main.py
+./run.sh
 ```
 
 Or give it a single task:
 
 ```bash
-python main.py "Search for today's top tech news and save a 5-bullet summary to news.md"
+./run.sh "What's 18% tip on $247.60, split 3 ways?"
 ```
+
+Add `--local` to force the free model even when a key is saved.
 
 Try prompts that need several steps:
 

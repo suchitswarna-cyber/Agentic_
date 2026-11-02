@@ -151,7 +151,8 @@ def recall() -> str:
 # Server-side tool: runs on Anthropic's infrastructure, no local code needed.
 WEB_SEARCH = {"type": "web_search_20260209", "name": "web_search", "max_uses": 5}
 
-ALL_TOOLS = [
+# Tools that run on this computer (used by both the Claude and the local agent).
+LOCAL_TOOLS = [
     calculator,
     get_current_time,
     list_files,
@@ -159,5 +160,6 @@ ALL_TOOLS = [
     write_file,
     remember,
     recall,
-    WEB_SEARCH,
 ]
+
+ALL_TOOLS = LOCAL_TOOLS + [WEB_SEARCH]
