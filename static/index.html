@@ -15,7 +15,6 @@
     --accent-text: #ffffff;
     --user-bubble: #3d63dd;
     --bot-bubble: #ffffff;
-    --chip: #eef1f6;
     --code: #f0f2f5;
     --error: #c2362b;
   }
@@ -30,7 +29,6 @@
       --accent-text: #0d1017;
       --user-bubble: #3d5bc4;
       --bot-bubble: #1e2228;
-      --chip: #242931;
       --code: #262b33;
       --error: #f0786d;
     }
@@ -96,14 +94,6 @@
   .bot .bubble pre { background: var(--code); padding: 10px; border-radius: 8px; overflow-x: auto; }
   .bot .bubble pre code { background: none; padding: 0; }
   .error .bubble { color: var(--error); }
-
-  .tools { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
-  .tool {
-    font-size: 12px; color: var(--muted); background: var(--chip);
-    padding: 3px 9px; border-radius: 999px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
 
   .typing { display: inline-flex; gap: 4px; padding: 14px 16px; }
   .typing span {
@@ -205,23 +195,10 @@
     }).join("").replace(/\u0000(\d+)\u0000/g, (_, i) => blocks[+i]);
   }
 
-  function addMessage(role, html, tools = []) {
+  function addMessage(role, html) {
     document.getElementById("welcome")?.remove();
     const msg = document.createElement("div");
     msg.className = `msg ${role}`;
-    if (tools.length) {
-      const row = document.createElement("div");
-      row.className = "tools";
-      for (const t of tools) {
-        const chip = document.createElement("span");
-        chip.className = "tool";
-        const args = Object.values(t.args || {}).map(v => JSON.stringify(v)).join(", ");
-        chip.textContent = `⚙ ${t.name}(${args})`;
-        chip.title = chip.textContent;
-        row.appendChild(chip);
-      }
-      msg.appendChild(row);
-    }
     const bubble = document.createElement("div");
     bubble.className = "bubble";
     bubble.innerHTML = html;
@@ -248,7 +225,7 @@
       const data = await res.json();
       typing.remove();
       if (data.error) addMessage("bot error", escapeHtml(data.error));
-      else addMessage("bot", renderMarkdown(data.answer), data.tools);
+      else addMessage("bot", renderMarkdown(data.answer));
     } catch {
       typing.remove();
       addMessage("bot error", "Can't reach the SSC server. Is ./run_web.sh still running?");
