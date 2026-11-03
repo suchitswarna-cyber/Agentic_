@@ -9,12 +9,15 @@ import sys
 import threading
 
 import anthropic
+import ollama
 from flask import Flask, jsonify, request, send_from_directory
 
 from agent import Agent
+from attachments import parse
 from local_agent import LocalAgent
 
 app = Flask(__name__, static_folder="static")
+app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # uploads arrive as base64 JSON
 
 USE_CLAUDE = bool(os.environ.get("ANTHROPIC_API_KEY")) and "--local" not in sys.argv
 MODE = "Claude" if USE_CLAUDE else "Free local model"
@@ -45,7 +48,11 @@ def info():
 def chat():
     body = request.get_json(force=True)
     message = (body.get("message") or "").strip()
-    if not message:
+    try:
+        attachments = [parse(a) for a in body.get("attachments") or []]
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
+    if not message and not attachments:
         return jsonify(error="Empty message"), 400
 
     agent = _get_agent(body.get("session", "default"))
@@ -53,9 +60,11 @@ def chat():
     agent.on_tool_call = lambda name, args: tool_calls.append({"name": name, "args": args})
 
     try:
-        answer = agent.chat(message)
+        answer = agent.chat(message, attachments)
     except ConnectionError:
         return jsonify(error="Can't reach Ollama. Open the Ollama app and try again."), 503
+    except ollama.ResponseError as e:
+        return jsonify(error=f"Local model error: {e.error}"), 502
     except anthropic.AuthenticationError:
         return jsonify(error="Your Claude API key was rejected. Run ./add_key.sh again."), 401
     except anthropic.RateLimitError:

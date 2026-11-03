@@ -7,9 +7,11 @@ no tool runner. No API key or credits needed.
 
 import ollama
 
+from attachments import default_question
 from tools import LOCAL_TOOLS
 
 MODEL = "qwen2.5:3b"
+VISION_MODEL = "moondream"  # the main model can't see pictures, so this one looks at them
 MAX_STEPS = 8  # stop runaway tool loops
 
 SYSTEM_PROMPT = """Your name is SSC. You are a helpful assistant running locally.
@@ -49,11 +51,23 @@ class LocalAgent:
         self.messages: list = [{"role": "system", "content": SYSTEM_PROMPT}]
         self.on_tool_call = on_tool_call
 
-    def chat(self, user_input: str) -> str:
-        self.messages.append({"role": "user", "content": user_input})
+    def chat(self, user_input: str, attachments=()) -> str:
+        user_input = user_input or default_question(attachments)
+        text = user_input
+        for a in attachments:
+            if a.kind != "image":
+                text += f"\n\nAttached file '{a.name}':\n```\n{a.as_text()}\n```"
+
+        images = [a for a in attachments if a.kind == "image"]
+        if images:
+            return self._look(user_input, text, images)
+
+        self.messages.append({"role": "user", "content": text})
 
         for _ in range(MAX_STEPS):
-            response = ollama.chat(model=MODEL, messages=self.messages, tools=_TOOL_SPECS)
+            response = ollama.chat(
+                model=MODEL, messages=self.messages, tools=_TOOL_SPECS, options={"num_ctx": 8192}
+            )
             message = response.message
             self.messages.append(message)
 
@@ -72,6 +86,42 @@ class LocalAgent:
                 self.messages.append({"role": "tool", "tool_name": name, "content": str(result)})
 
         return "(stopped: too many tool steps)"
+
+    def _look(self, question: str, text: str, images) -> str:
+        """Answer a question about pictures with the vision model."""
+        answers = []
+        for img in images:
+            answer = self._see(img, question)
+            if not answer:
+                # moondream sometimes goes blank on short questions but can always
+                # describe the picture, so let the main model answer from that.
+                description = self._see(img, "Describe this picture in detail.")
+                response = ollama.chat(model=MODEL, messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": f"A picture shows: {description}\n\n"
+                                                f"Using that description, answer: {question}"},
+                ])
+                answer = (response.message.content or "").strip()
+            answers.append(answer)
+
+        if len(images) == 1:
+            answer = answers[0]
+        else:
+            answer = "\n\n".join(f"**{img.name}:** {a}" for img, a in zip(images, answers))
+        answer = answer or "(I couldn't make out that picture.)"
+
+        # Keep it in the main conversation so follow-up questions have context.
+        names = ", ".join(img.name for img in images)
+        self.messages.append({"role": "user", "content": f"{text}\n\n[Attached picture: {names}]"})
+        self.messages.append({"role": "assistant", "content": answer})
+        return answer
+
+    @staticmethod
+    def _see(img, prompt: str) -> str:
+        response = ollama.chat(
+            model=VISION_MODEL, messages=[{"role": "user", "content": prompt, "images": [img.data]}]
+        )
+        return (response.message.content or "").strip()
 
     def reset(self):
         self.messages = self.messages[:1]

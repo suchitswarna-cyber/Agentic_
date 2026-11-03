@@ -8,6 +8,7 @@ runner leaves to us (paused server-tool turns, refusals).
 
 import anthropic
 
+from attachments import default_question
 from tools import ALL_TOOLS
 
 MODEL = "claude-opus-5-5"
@@ -63,8 +64,19 @@ class Agent:
                 self.messages.append(tool_response)
         return last
 
-    def chat(self, user_input: str) -> str:
-        self.messages.append({"role": "user", "content": user_input})
+    def chat(self, user_input: str, attachments=()) -> str:
+        user_input = user_input or default_question(attachments)
+        content = []
+        for a in attachments:
+            if a.kind == "image":
+                content.append({"type": "image", "source": {"type": "base64", "media_type": a.mime, "data": a.b64}})
+            elif a.kind == "pdf":
+                content.append({"type": "document", "title": a.name,
+                                "source": {"type": "base64", "media_type": "application/pdf", "data": a.b64}})
+            else:
+                content.append({"type": "text", "text": f"Attached file '{a.name}':\n```\n{a.text}\n```"})
+        content.append({"type": "text", "text": user_input})
+        self.messages.append({"role": "user", "content": content})
 
         # A long web search can pause the turn; restart the runner to resume it.
         for _ in range(5):

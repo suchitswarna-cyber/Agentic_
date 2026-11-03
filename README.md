@@ -25,6 +25,7 @@ SSC doesn't just answer — it **plans, calls tools, looks at the results, and k
 | `agent.py` | Claude agent: model, system prompt, conversation history, the loop |
 | `local_agent.py` | Free agent using a local model via Ollama |
 | `tools.py` | The tools Claude can use (each is a plain Python function) |
+| `attachments.py` | Reads files and pictures you attach in the webpage |
 | `main.py`  | Command-line chat interface |
 | `web.py` + `static/index.html` | Chat webpage at http://localhost:8000 |
 
@@ -61,6 +62,7 @@ For free mode, install [Ollama](https://ollama.com/download) and download the mo
 
 ```bash
 ollama pull qwen2.5:3b
+ollama pull moondream   # lets SSC look at pictures
 ```
 
 Optional: to use Claude instead, run `./add_key.sh` and paste a key from console.anthropic.com.
@@ -73,7 +75,13 @@ Optional: to use Claude instead, run `./add_key.sh` and paste a key from console
 ./run_web.sh
 ```
 
-Then open **http://localhost:8000**. Each reply shows which tools the bot used.
+Then open **http://localhost:8000**.
+
+Click 📎 (or drag a file onto the page, or paste a screenshot) to ask about a file or picture:
+
+- **Text files** (TXT, MD, CSV, JSON, code) and **PDFs**: SSC reads the text. Very long files are cut to the first ~12,000 characters in free mode.
+- **Pictures** (PNG, JPG, GIF, WebP): in free mode the small `moondream` model looks at them; with a Claude key, Claude reads them directly.
+- Up to 10 MB per file.
 
 ### In the terminal
 

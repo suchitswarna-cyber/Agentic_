@@ -1,3 +1,4 @@
 anthropic>=0.116.0
 ollama>=0.6.0
 flask>=3.0
+pypdf>=5.0

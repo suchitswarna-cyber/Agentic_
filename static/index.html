@@ -95,6 +95,23 @@
   .bot .bubble pre code { background: none; padding: 0; }
   .error .bubble { color: var(--error); }
 
+  .files { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; justify-content: flex-end; }
+  .files img { max-width: 220px; max-height: 220px; border-radius: 10px; border: 1px solid var(--border); display: block; }
+  .file {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 13px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 5px 9px;
+    max-width: 260px;
+  }
+  .file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #pending { max-width: 760px; margin: 0 auto 8px; justify-content: flex-start; }
+  #pending:empty { display: none; }
+  #pending .file { padding: 4px 4px 4px 6px; }
+  #pending img { width: 36px; height: 36px; object-fit: cover; border-radius: 5px; border: 0; }
+  #pending button { border: 0; background: none; padding: 0 5px; color: var(--muted); font-size: 16px; line-height: 1; }
+  form button.attach { background: none; color: var(--muted); font-size: 20px; padding: 4px 8px; font-weight: 400; }
+  form button.attach:hover { color: var(--text); }
+  body.dragging main { outline: 2px dashed var(--accent); outline-offset: -8px; }
+
   .typing { display: inline-flex; gap: 4px; padding: 14px 16px; }
   .typing span {
     width: 7px; height: 7px; border-radius: 50%; background: var(--muted);
@@ -147,11 +164,14 @@
 </main>
 
 <footer>
+  <div class="files" id="pending"></div>
   <form id="form">
+    <button class="attach" id="attach" type="button" title="Attach files or pictures" aria-label="Attach files or pictures">📎</button>
+    <input id="picker" type="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp,.pdf,.txt,.md,.csv,.json,.py,.js,.ts,.html,.css,.xml,.yaml,.yml,.log">
     <textarea id="input" rows="1" placeholder="Message SSC…" autofocus></textarea>
     <button id="send" type="submit">Send</button>
   </form>
-  <div class="hint">Enter to send · Shift+Enter for a new line</div>
+  <div class="hint">Enter to send · Shift+Enter for a new line · 📎 or drop files and pictures to ask about them</div>
 </footer>
 
 <script>
@@ -161,6 +181,8 @@
   const send = document.getElementById("send");
   let session = crypto.randomUUID();
   let busy = false;
+  let pending = [];  // attachments waiting to be sent: {name, type, data, url}
+  const MAX_FILE = 10 * 1024 * 1024;
 
   fetch("/api/info").then(r => r.json()).then(d => {
     document.getElementById("mode").textContent = d.mode;
@@ -195,10 +217,31 @@
     }).join("").replace(/\u0000(\d+)\u0000/g, (_, i) => blocks[+i]);
   }
 
-  function addMessage(role, html) {
+  function fileTile(f) {
+    if (f.type.startsWith("image/")) {
+      const img = document.createElement("img");
+      img.src = f.url; img.alt = f.name; img.title = f.name;
+      return img;
+    }
+    const tile = document.createElement("div");
+    tile.className = "file";
+    tile.innerHTML = `📄 <span></span>`;
+    tile.querySelector("span").textContent = f.name;
+    tile.title = f.name;
+    return tile;
+  }
+
+  function addMessage(role, html, files = []) {
     document.getElementById("welcome")?.remove();
     const msg = document.createElement("div");
     msg.className = `msg ${role}`;
+    if (files.length) {
+      const row = document.createElement("div");
+      row.className = "files";
+      files.forEach(f => row.appendChild(fileTile(f)));
+      msg.appendChild(row);
+    }
+    if (html === null) { messages.appendChild(msg); scroller.scrollTop = scroller.scrollHeight; return msg; }
     const bubble = document.createElement("div");
     bubble.className = "bubble";
     bubble.innerHTML = html;
@@ -209,9 +252,11 @@
   }
 
   async function ask(text) {
-    if (busy || !text.trim()) return;
+    if (busy || (!text.trim() && !pending.length)) return;
     busy = true; send.disabled = true;
-    addMessage("user", escapeHtml(text));
+    const files = pending;
+    pending = []; renderPending();
+    addMessage("user", text.trim() ? escapeHtml(text) : null, files);
     input.value = ""; autosize();
     const typing = addMessage("bot", '<div class="typing"><span></span><span></span><span></span></div>');
     typing.querySelector(".bubble").style.padding = "0";
@@ -220,7 +265,7 @@
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({message: text, session}),
+        body: JSON.stringify({message: text, session, attachments: files.map(({name, type, data}) => ({name, type, data}))}),
       });
       const data = await res.json();
       typing.remove();
@@ -232,6 +277,53 @@
     }
     busy = false; send.disabled = false; input.focus();
   }
+
+  function renderPending() {
+    const box = document.getElementById("pending");
+    box.innerHTML = "";
+    pending.forEach((f, i) => {
+      const chip = document.createElement("div");
+      chip.className = "file";
+      if (f.type.startsWith("image/")) chip.appendChild(fileTile(f));
+      const name = document.createElement("span");
+      name.textContent = f.name;
+      const x = document.createElement("button");
+      x.type = "button"; x.textContent = "×"; x.title = "Remove"; x.setAttribute("aria-label", `Remove ${f.name}`);
+      x.addEventListener("click", () => { pending.splice(i, 1); renderPending(); });
+      chip.append(name, x);
+      box.appendChild(chip);
+    });
+  }
+
+  function addFiles(list) {
+    for (const file of list) {
+      if (file.size > MAX_FILE) { addMessage("bot error", escapeHtml(`'${file.name}' is too big (max 10 MB).`)); continue; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const url = reader.result;
+        pending.push({name: file.name || "pasted-image.png", type: file.type || "", data: url.slice(url.indexOf(",") + 1), url});
+        renderPending();
+      };
+      reader.readAsDataURL(file);
+    }
+    input.focus();
+  }
+
+  const picker = document.getElementById("picker");
+  document.getElementById("attach").addEventListener("click", () => picker.click());
+  picker.addEventListener("change", () => { addFiles(picker.files); picker.value = ""; });
+  input.addEventListener("paste", e => {
+    const files = [...e.clipboardData.files];
+    if (files.length) { e.preventDefault(); addFiles(files); }
+  });
+  let dragDepth = 0;
+  document.addEventListener("dragenter", e => { e.preventDefault(); dragDepth++; document.body.classList.add("dragging"); });
+  document.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove("dragging"); } });
+  document.addEventListener("dragover", e => e.preventDefault());
+  document.addEventListener("drop", e => {
+    e.preventDefault(); dragDepth = 0; document.body.classList.remove("dragging");
+    addFiles(e.dataTransfer.files);
+  });
 
   function autosize() {
     input.style.height = "auto";
