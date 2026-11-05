@@ -6,30 +6,32 @@
 <title>SSC</title>
 <style>
   :root {
-    --bg: #f6f7f9;
+    --bg: #ffffff;
     --panel: #ffffff;
-    --text: #1b1f24;
-    --muted: #6b7380;
-    --border: #e3e6eb;
-    --accent: #3d63dd;
+    --text: #000000;
+    --muted: #666666;
+    --border: #d9d9d9;
+    --accent: #000000;
     --accent-text: #ffffff;
-    --user-bubble: #3d63dd;
+    --user-bubble: #000000;
+    --user-text: #ffffff;
     --bot-bubble: #ffffff;
-    --code: #f0f2f5;
+    --code: #f2f2f2;
     --error: #c2362b;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #111317;
-      --panel: #181b20;
-      --text: #e7e9ec;
-      --muted: #8b93a0;
-      --border: #2a2f37;
-      --accent: #6d8cf0;
-      --accent-text: #0d1017;
-      --user-bubble: #3d5bc4;
-      --bot-bubble: #1e2228;
-      --code: #262b33;
+      --bg: #000000;
+      --panel: #0d0d0d;
+      --text: #ffffff;
+      --muted: #999999;
+      --border: #333333;
+      --accent: #ffffff;
+      --accent-text: #000000;
+      --user-bubble: #ffffff;
+      --user-text: #000000;
+      --bot-bubble: #141414;
+      --code: #1f1f1f;
       --error: #f0786d;
     }
   }
@@ -85,7 +87,7 @@
   .bubble {
     padding: 10px 14px; border-radius: 14px; overflow-wrap: anywhere;
   }
-  .user .bubble { background: var(--user-bubble); color: #fff; border-bottom-right-radius: 4px; white-space: pre-wrap; }
+  .user .bubble { background: var(--user-bubble); color: var(--user-text); border-bottom-right-radius: 4px; white-space: pre-wrap; }
   .bot .bubble { background: var(--bot-bubble); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
   .bot .bubble p { margin: 0 0 8px; }
   .bot .bubble p:last-child { margin-bottom: 0; }
