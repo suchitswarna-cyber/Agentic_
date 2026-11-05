@@ -7,12 +7,10 @@ Usage:
 
 import argparse
 import json
-import os
 
 import anthropic
 
 from agent import Agent
-from local_agent import LocalAgent
 
 DIM, CYAN, GREEN, RESET = "\033[2m", "\033[36m", "\033[32m", "\033[0m"
 CLEAR_LINE = "\r\033[K"
@@ -46,8 +44,6 @@ def ask(agent, prompt: str):
         print(f"{CLEAR_LINE}{GREEN}SSC:{RESET} {agent.chat(prompt)}\n")
     except KeyboardInterrupt:
         print(f"{CLEAR_LINE}(stopped)\n")
-    except ConnectionError:
-        print(f"{CLEAR_LINE}Can't reach Ollama - open the Ollama app and try again.")
     except anthropic.AuthenticationError:
         print(f"{CLEAR_LINE}Authentication failed. Run ./add_key.sh again (see README).")
     except anthropic.RateLimitError:
@@ -64,21 +60,15 @@ def main():
     parser.add_argument("--effort", default="high",
                         choices=["low", "medium", "high", "xhigh", "max"],
                         help="How hard the agent thinks (default: high)")
-    parser.add_argument("--local", action="store_true",
-                        help="Use the free local model even if an API key is set")
     args = parser.parse_args()
 
-    # Use Claude when an API key is available, otherwise the free local model.
-    if os.environ.get("ANTHROPIC_API_KEY") and not args.local:
-        agent, mode = Agent(effort=args.effort, on_tool_call=log_tool), "Claude"
-    else:
-        agent, mode = LocalAgent(on_tool_call=log_tool), "free local model"
+    agent = Agent(effort=args.effort, on_tool_call=log_tool)
 
     if args.task:
         ask(agent, args.task)
         return
 
-    print(f"{CYAN}SSC agent ready ({mode}).{RESET} Type /help for ideas.\n")
+    print(f"{CYAN}SSC agent ready (Claude).{RESET} Type /help for ideas.\n")
     while True:
         try:
             user = input(f"{CYAN}You:{RESET} ").strip()

@@ -4,23 +4,18 @@ Usage:
     ./run_web.sh           # then open http://localhost:8000
 """
 
-import os
-import sys
 import threading
 
 import anthropic
-import ollama
 from flask import Flask, jsonify, request, send_from_directory
 
 from agent import Agent
 from attachments import parse
-from local_agent import LocalAgent
 
 app = Flask(__name__, static_folder="static")
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # uploads arrive as base64 JSON
 
-USE_CLAUDE = bool(os.environ.get("ANTHROPIC_API_KEY")) and "--local" not in sys.argv
-MODE = "Claude" if USE_CLAUDE else "Free local model"
+MODE = "Claude"
 
 # One agent (and conversation) per browser tab, keyed by an id the page sends.
 _agents: dict = {}
@@ -30,7 +25,7 @@ _lock = threading.Lock()
 def _get_agent(session_id: str):
     with _lock:
         if session_id not in _agents:
-            _agents[session_id] = Agent() if USE_CLAUDE else LocalAgent()
+            _agents[session_id] = Agent()
         return _agents[session_id]
 
 
@@ -61,10 +56,6 @@ def chat():
 
     try:
         answer = agent.chat(message, attachments)
-    except ConnectionError:
-        return jsonify(error="Can't reach Ollama. Open the Ollama app and try again."), 503
-    except ollama.ResponseError as e:
-        return jsonify(error=f"Local model error: {e.error}"), 502
     except anthropic.AuthenticationError:
         return jsonify(error="Your Claude API key was rejected. Run ./add_key.sh again."), 401
     except anthropic.RateLimitError:

@@ -1,14 +1,13 @@
 #!/bin/bash
 # Starts SSC from any folder.
-# Uses Claude if you've saved an API key (./add_key.sh), otherwise the free local model.
+# Needs a Claude API key: run ./add_key.sh once to save it.
 cd "$(dirname "$0")"
 source .venv/bin/activate
 [ -f .env ] && source .env
 
-if [ -z "$ANTHROPIC_API_KEY" ] && ! curl -s localhost:11434/api/version >/dev/null; then
-  echo "Starting Ollama..."
-  open -a Ollama
-  for _ in $(seq 1 20); do curl -s localhost:11434/api/version >/dev/null && break; sleep 1; done
+if [ -z "$ANTHROPIC_API_KEY" ]; then
+  echo "No Claude API key saved. Run ./add_key.sh first, then try again."
+  exit 1
 fi
 
 python main.py "$@"

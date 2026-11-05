@@ -23,7 +23,6 @@ SSC doesn't just answer — it **plans, calls tools, looks at the results, and k
 | File | Role |
 |---|---|
 | `agent.py` | Claude agent: model, system prompt, conversation history, the loop |
-| `local_agent.py` | Free agent using a local model via Ollama |
 | `tools.py` | The tools Claude can use (each is a plain Python function) |
 | `attachments.py` | Reads files and pictures you attach in the webpage |
 | `main.py`  | Command-line chat interface |
@@ -37,35 +36,21 @@ SSC doesn't just answer — it **plans, calls tools, looks at the results, and k
 | `get_current_time` | Current date/time in any timezone |
 | `get_weather` | Live weather for any city (Open-Meteo, free) |
 | `search_wikipedia` | Wikipedia summaries for facts and topics |
-| `web_search` | Live web search (Claude mode only) |
+| `web_search` | Live web search |
 | `list_files` / `read_file` / `write_file` | File access, sandboxed to `./workspace` |
 | `remember` / `recall` | Long-term memory saved to `memory.json`, kept across runs |
 
-## Two ways to run it
-
-| Mode | Brain | Cost | Web search |
-|---|---|---|---|
-| **Free (default)** | `qwen2.5:3b` running on your Mac via [Ollama](https://ollama.com) | Free, offline | No |
-| **Claude** | `claude-opus-5-5` | Pay-per-use API key | Yes |
-
-The bot uses Claude when an API key is saved, otherwise the free local model.
-
 ## Setup
 
+SSC runs on Claude, so you need a Claude API key from [console.anthropic.com](https://console.anthropic.com). Usage is billed per request.
+
 ```bash
-cd agentic-bot
+git clone https://github.com/suchitswarna-cyber/Agentic_.git
+cd Agentic_
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+./add_key.sh        # paste your key when asked; it's saved to .env (never committed)
 ```
-
-For free mode, install [Ollama](https://ollama.com/download) and download the model once:
-
-```bash
-ollama pull qwen2.5:3b
-ollama pull moondream   # lets SSC look at pictures
-```
-
-Optional: to use Claude instead, run `./add_key.sh` and paste a key from console.anthropic.com.
 
 ## Run it
 
@@ -79,8 +64,9 @@ Then open **http://localhost:8000**.
 
 Click 📎 (or drag a file onto the page, or paste a screenshot) to ask about a file or picture:
 
-- **Text files** (TXT, MD, CSV, JSON, code) and **PDFs**: SSC reads the text. Very long files are cut to the first ~12,000 characters in free mode.
-- **Pictures** (PNG, JPG, GIF, WebP): in free mode the small `moondream` model looks at them; with a Claude key, Claude reads them directly.
+- **Text files** (TXT, MD, CSV, JSON, code): Claude reads the whole file.
+- **PDFs**: Claude reads the pages directly, including tables and charts.
+- **Pictures** (PNG, JPG, GIF, WebP): Claude looks at them directly.
 - Up to 10 MB per file.
 
 ### In the terminal
@@ -94,8 +80,6 @@ Or give it a single task:
 ```bash
 ./run.sh "What's 18% tip on $247.60, split 3 ways?"
 ```
-
-Add `--local` to force the free model even when a key is saved.
 
 Try prompts that need several steps:
 

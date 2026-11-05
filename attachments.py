@@ -1,7 +1,7 @@
 """Files and pictures the user attaches to a message.
 
 The web page sends each one as {name, type, data} with base64 data. We sort
-them into pictures, PDFs and text files so each model gets what it can read.
+them into pictures, PDFs and text files so each goes to Claude the right way.
 """
 
 import base64
@@ -10,7 +10,6 @@ import io
 from pypdf import PdfReader
 
 MAX_BYTES = 10 * 1024 * 1024
-MAX_TEXT_CHARS = 12000  # keep long files from overflowing the local model
 
 IMAGE_EXTS = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
               "gif": "image/gif", "webp": "image/webp"}
@@ -27,12 +26,6 @@ class Attachment:
     @property
     def b64(self) -> str:
         return base64.b64encode(self.data).decode()
-
-    def as_text(self) -> str:
-        """The file's text, cut short if it is very long."""
-        if len(self.text) <= MAX_TEXT_CHARS:
-            return self.text
-        return self.text[:MAX_TEXT_CHARS] + "\n[... rest of file cut off ...]"
 
 
 def parse(raw: dict) -> Attachment:
