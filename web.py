@@ -9,13 +9,14 @@ import threading
 import anthropic
 from flask import Flask, jsonify, request, send_from_directory
 
-from agent import Agent
 from attachments import parse
+from gemini_agent import errors as genai_errors
+from providers import make_agent, provider_name
 
 app = Flask(__name__, static_folder="static")
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # uploads arrive as base64 JSON
 
-MODE = "Claude"
+MODE = provider_name()
 
 # One agent (and conversation) per browser tab, keyed by an id the page sends.
 _agents: dict = {}
@@ -25,7 +26,7 @@ _lock = threading.Lock()
 def _get_agent(session_id: str):
     with _lock:
         if session_id not in _agents:
-            _agents[session_id] = Agent()
+            _agents[session_id], _ = make_agent()
         return _agents[session_id]
 
 
@@ -64,6 +65,12 @@ def chat():
         return jsonify(error=f"API error {e.status_code}: {e.message}"), 502
     except anthropic.APIConnectionError:
         return jsonify(error="Could not reach the Claude API. Check your connection."), 502
+    except genai_errors.APIError as e:
+        if e.code in (400, 401, 403) and "key" in str(e).lower():
+            return jsonify(error="Your Google API key was rejected. Run ./add_key.sh again."), 401
+        if e.code == 429:
+            return jsonify(error="Google's free limit is used up for now. Wait a bit and try again."), 429
+        return jsonify(error=f"Google API error {e.code}: {e.message}"), 502
 
     return jsonify(answer=answer, tools=tool_calls)
 

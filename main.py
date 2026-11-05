@@ -10,7 +10,8 @@ import json
 
 import anthropic
 
-from agent import Agent
+from gemini_agent import errors as genai_errors
+from providers import make_agent
 
 DIM, CYAN, GREEN, RESET = "\033[2m", "\033[36m", "\033[32m", "\033[0m"
 CLEAR_LINE = "\r\033[K"
@@ -52,6 +53,11 @@ def ask(agent, prompt: str):
         print(f"{CLEAR_LINE}API error {e.status_code}: {e.message}")
     except anthropic.APIConnectionError:
         print(f"{CLEAR_LINE}Could not reach the API - check your connection.")
+    except genai_errors.APIError as e:
+        if e.code == 429:
+            print(f"{CLEAR_LINE}Google's free limit is used up for now - wait a bit and try again.")
+        else:
+            print(f"{CLEAR_LINE}Google API error {e.code}: {e.message} (run ./add_key.sh if your key is wrong)")
 
 
 def main():
@@ -62,13 +68,13 @@ def main():
                         help="How hard the agent thinks (default: high)")
     args = parser.parse_args()
 
-    agent = Agent(effort=args.effort, on_tool_call=log_tool)
+    agent, mode = make_agent(effort=args.effort, on_tool_call=log_tool)
 
     if args.task:
         ask(agent, args.task)
         return
 
-    print(f"{CYAN}SSC agent ready (Claude).{RESET} Type /help for ideas.\n")
+    print(f"{CYAN}SSC agent ready ({mode}).{RESET} Type /help for ideas.\n")
     while True:
         try:
             user = input(f"{CYAN}You:{RESET} ").strip()

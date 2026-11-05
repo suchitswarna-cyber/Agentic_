@@ -1,6 +1,6 @@
 # SSC — an agentic AI bot
 
-A small, readable agentic AI project built on Claude (`claude-opus-5-5`).
+A small, readable agentic AI project that runs on **Google Gemini** (free tier, `gemini-flash-latest`) or **Claude** (`claude-opus-5-5`).
 SSC doesn't just answer — it **plans, calls tools, looks at the results, and keeps going** until the task is done.
 
 ## How it works
@@ -22,7 +22,9 @@ SSC doesn't just answer — it **plans, calls tools, looks at the results, and k
 
 | File | Role |
 |---|---|
-| `agent.py` | Claude agent: model, system prompt, conversation history, the loop |
+| `agent.py` | Claude version: model, system prompt, conversation history, the loop |
+| `gemini_agent.py` | Google Gemini version of the same agent |
+| `providers.py` | Picks Gemini or Claude depending on which key you saved |
 | `tools.py` | The tools Claude can use (each is a plain Python function) |
 | `attachments.py` | Reads files and pictures you attach in the webpage |
 | `main.py`  | Command-line chat interface |
@@ -36,20 +38,27 @@ SSC doesn't just answer — it **plans, calls tools, looks at the results, and k
 | `get_current_time` | Current date/time in any timezone |
 | `get_weather` | Live weather for any city (Open-Meteo, free) |
 | `search_wikipedia` | Wikipedia summaries for facts and topics |
-| `web_search` | Live web search |
+| `web_search` | Live web search (Claude only) |
 | `list_files` / `read_file` / `write_file` | File access, sandboxed to `./workspace` |
 | `remember` / `recall` | Long-term memory saved to `memory.json`, kept across runs |
 
 ## Setup
 
-SSC runs on Claude, so you need a Claude API key from [console.anthropic.com](https://console.anthropic.com). Usage is billed per request.
+You need an API key from one of these:
+
+| AI | Where to get a key | Cost |
+|---|---|---|
+| **Google Gemini** | [aistudio.google.com](https://aistudio.google.com) → Get API key | Free, with daily limits |
+| **Claude** | [console.anthropic.com](https://console.anthropic.com) → API Keys | Paid per request |
+
+If both keys are saved, SSC uses Gemini.
 
 ```bash
 git clone https://github.com/suchitswarna-cyber/Agentic_.git
 cd Agentic_
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-./add_key.sh        # paste your key when asked; it's saved to .env (never committed)
+./add_key.sh        # paste your Google or Claude key; it's saved to .env (never committed)
 ```
 
 ## Run it
@@ -64,9 +73,9 @@ Then open **http://localhost:8000**.
 
 Click 📎 (or drag a file onto the page, or paste a screenshot) to ask about a file or picture:
 
-- **Text files** (TXT, MD, CSV, JSON, code): Claude reads the whole file.
-- **PDFs**: Claude reads the pages directly, including tables and charts.
-- **Pictures** (PNG, JPG, GIF, WebP): Claude looks at them directly.
+- **Text files** (TXT, MD, CSV, JSON, code): the AI reads the whole file.
+- **PDFs**: read directly, including tables and charts.
+- **Pictures** (PNG, JPG, GIF, WebP): the AI looks at them directly.
 - Up to 10 MB per file.
 
 ### In the terminal
@@ -88,7 +97,7 @@ Try prompts that need several steps:
 - "What time is it in Tokyo and London right now?"
 - "Write a study plan for learning agentic AI to plan.md, then read it back to me."
 
-Use `--effort low` for faster, cheaper answers or `--effort xhigh` for harder tasks.
+With Claude, use `--effort low` for faster, cheaper answers or `--effort xhigh` for harder tasks.
 Chat commands: `/help` shows ideas, `/reset` clears the conversation, `/quit` exits.
 
 ## Add your own tool
