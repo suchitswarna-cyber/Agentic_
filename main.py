@@ -53,9 +53,13 @@ def ask(agent, prompt: str):
         print(f"{CLEAR_LINE}API error {e.status_code}: {e.message}")
     except anthropic.APIConnectionError:
         print(f"{CLEAR_LINE}Could not reach the API - check your connection.")
+    except TimeoutError as e:
+        print(f"{CLEAR_LINE}{e}")
     except genai_errors.APIError as e:
         if e.code == 429:
             print(f"{CLEAR_LINE}Google's free limit is used up for now - wait a bit and try again.")
+        elif e.code == 503:
+            print(f"{CLEAR_LINE}Google's Gemini models are overloaded right now - try again in a minute.")
         else:
             print(f"{CLEAR_LINE}Google API error {e.code}: {e.message} (run ./add_key.sh if your key is wrong)")
 

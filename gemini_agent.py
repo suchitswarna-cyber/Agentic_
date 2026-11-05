@@ -7,6 +7,8 @@ until it has an answer. Gemini's free tier has daily limits.
 import os
 import warnings
 
+import httpx
+
 # The Google libraries warn loudly about this Mac's older Python; the bot works fine.
 warnings.filterwarnings("ignore", category=FutureWarning, module="google")
 warnings.filterwarnings("ignore", message="urllib3 v2 only supports OpenSSL")
@@ -17,7 +19,11 @@ from google.genai import errors, types  # noqa: E402,F401  (errors is used by we
 from attachments import default_question  # noqa: E402
 from tools import LOCAL_TOOLS  # noqa: E402
 
-MODEL = "gemini-flash-latest"  # always the current Flash model, so retirements don't break SSC
+# Tried in order. When one is overloaded (503) or out of free quota (429), SSC
+# moves to the next. The "-latest" names follow Google's newest models, so
+# model retirements don't break SSC.
+MODELS = ["gemini-flash-latest", "gemini-3.5-flash", "gemini-flash-lite-latest"]
+BUSY_CODES = (429, 503)
 MAX_STEPS = 10  # stop runaway tool loops
 
 SYSTEM_PROMPT = """You are SSC, a helpful autonomous assistant.
@@ -44,7 +50,17 @@ _TOOLS_BY_NAME = {t.name: t for t in LOCAL_TOOLS}
 
 class GeminiAgent:
     def __init__(self, on_tool_call=None, **_):
-        self.client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+        self.client = genai.Client(
+            api_key=os.environ["GEMINI_API_KEY"],
+            # Fail within a minute instead of retrying for minutes; we switch models instead.
+            http_options=types.HttpOptions(timeout=60_000, retry_options=types.HttpRetryOptions(attempts=1)),
+        )
+        self.config = types.GenerateContentConfig(
+            system_instruction=SYSTEM_PROMPT,
+            tools=[types.Tool(function_declarations=_DECLARATIONS)],
+            # We run the tools ourselves so the page can show progress and errors.
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+        )
         self.on_tool_call = on_tool_call
         self.reset()
 
@@ -57,11 +73,11 @@ class GeminiAgent:
                 parts.append(types.Part.from_bytes(data=a.data, mime_type=a.mime))
         parts.append(types.Part.from_text(text=user_input or default_question(attachments)))
 
-        response = self.session.send_message(parts)
+        response = self._send(parts)
         for _ in range(MAX_STEPS):
             calls = response.function_calls
             if not calls:
-                return (response.text or "").strip() or "(no response)"
+                return _text(response) or "(no response)"
 
             results = []
             for call in calls:
@@ -74,17 +90,37 @@ class GeminiAgent:
                 except Exception as e:
                     result = f"Error: {e}"
                 results.append(types.Part.from_function_response(name=name, response={"result": str(result)}))
-            response = self.session.send_message(results)
+            response = self._send(results)
 
         return "(stopped: too many tool steps)"
 
+    def _send(self, message):
+        """Send to the current model, moving down MODELS while Google is busy."""
+        while True:
+            index = MODELS.index(self.model)
+            last = index == len(MODELS) - 1
+            try:
+                return self.session.send_message(message)
+            except errors.APIError as e:
+                if e.code not in BUSY_CODES or last:
+                    raise
+            except httpx.TimeoutException:
+                if last:
+                    raise TimeoutError("Google took too long to answer. Try again in a minute.")
+            # A failed send isn't added to the history, so the next model
+            # picks up the same conversation and the same message.
+            self._start(MODELS[index + 1], self.session.get_history(curated=True))
+
+    def _start(self, model, history=None):
+        self.model = model
+        self.session = self.client.chats.create(model=model, config=self.config, history=history)
+
     def reset(self):
-        self.session = self.client.chats.create(
-            model=MODEL,
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_PROMPT,
-                tools=[types.Tool(function_declarations=_DECLARATIONS)],
-                # We run the tools ourselves so the page can show progress and errors.
-                automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
-            ),
-        )
+        self._start(MODELS[0])
+
+
+def _text(response) -> str:
+    """The reply's text, skipping thinking parts (avoids a noisy SDK warning)."""
+    content = response.candidates[0].content if response.candidates else None
+    parts = content.parts if content and content.parts else []
+    return "".join(p.text for p in parts if p.text and not p.thought).strip()

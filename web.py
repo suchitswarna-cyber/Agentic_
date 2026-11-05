@@ -65,11 +65,15 @@ def chat():
         return jsonify(error=f"API error {e.status_code}: {e.message}"), 502
     except anthropic.APIConnectionError:
         return jsonify(error="Could not reach the Claude API. Check your connection."), 502
+    except TimeoutError as e:
+        return jsonify(error=str(e)), 504
     except genai_errors.APIError as e:
         if e.code in (400, 401, 403) and "key" in str(e).lower():
             return jsonify(error="Your Google API key was rejected. Run ./add_key.sh again."), 401
         if e.code == 429:
             return jsonify(error="Google's free limit is used up for now. Wait a bit and try again."), 429
+        if e.code == 503:
+            return jsonify(error="Google's Gemini models are overloaded right now. Try again in a minute."), 503
         return jsonify(error=f"Google API error {e.code}: {e.message}"), 502
 
     return jsonify(answer=answer, tools=tool_calls)
