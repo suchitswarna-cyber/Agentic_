@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · SSC</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #ffffff;
+    --text: #000000;
+    --muted: #666666;
+    --border: #d9d9d9;
+    --accent: #000000;
+    --accent-text: #ffffff;
+    --error: #c2362b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000000;
+      --panel: #0d0d0d;
+      --text: #ffffff;
+      --muted: #999999;
+      --border: #333333;
+      --accent: #ffffff;
+      --accent-text: #000000;
+      --error: #f0786d;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+  }
+  .card {
+    width: 100%; max-width: 360px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px 28px 28px;
+    text-align: center;
+  }
+  .logo {
+    width: 48px; height: 48px; border-radius: 13px; margin: 0 auto 16px;
+    background: var(--accent); color: var(--accent-text);
+    display: grid; place-items: center; font-weight: 700; font-size: 22px;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  p { color: var(--muted); margin: 0 0 24px; }
+  label { display: block; text-align: left; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .field { position: relative; }
+  input {
+    width: 100%; font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--border); border-radius: 10px; padding: 11px 64px 11px 12px;
+    outline: none;
+  }
+  input:focus { border-color: var(--accent); }
+  .show {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    font: inherit; font-size: 13px; color: var(--muted); background: none; border: 0;
+    padding: 6px 8px; cursor: pointer;
+  }
+  .show:hover { color: var(--text); }
+  .submit {
+    width: 100%; margin-top: 16px; font: inherit; font-weight: 600;
+    background: var(--accent); color: var(--accent-text);
+    border: 0; border-radius: 10px; padding: 11px; cursor: pointer;
+  }
+  .submit:disabled { opacity: .5; cursor: default; }
+  .error { color: var(--error); font-size: 13px; min-height: 20px; margin-top: 10px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 18px; }
+</style>
+</head>
+<body>
+<form class="card" id="form">
+  <div class="logo">S</div>
+  <h1>Sign in to SSC</h1>
+  <p>Enter your password to start your bot.</p>
+  <label for="password">Password</label>
+  <div class="field">
+    <input id="password" type="password" autocomplete="current-password" autofocus required>
+    <button class="show" id="show" type="button" aria-label="Show password">Show</button>
+  </div>
+  <button class="submit" id="submit" type="submit">Sign in</button>
+  <div class="error" id="error" role="alert"></div>
+  <div class="hint">This is the APP_PASSWORD you set on Render. You stay signed in for 30 days.</div>
+</form>
+
+<script>
+  const form = document.getElementById("form");
+  const input = document.getElementById("password");
+  const submit = document.getElementById("submit");
+  const error = document.getElementById("error");
+  const show = document.getElementById("show");
+
+  show.addEventListener("click", () => {
+    const hidden = input.type === "password";
+    input.type = hidden ? "text" : "password";
+    show.textContent = hidden ? "Hide" : "Show";
+    show.setAttribute("aria-label", hidden ? "Hide password" : "Show password");
+    input.focus();
+  });
+  input.addEventListener("input", () => { error.textContent = ""; });
+
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    if (!input.value) { error.textContent = "Enter your password first."; return; }
+    submit.disabled = true; submit.textContent = "Signing in…"; error.textContent = "";
+    try {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({password: input.value}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) { location.replace("/"); return; }
+      error.textContent = data.error || "Couldn't sign in. Try again.";
+      input.select();
+    } catch {
+      error.textContent = "Can't reach SSC. If it was asleep, wait a minute and try again.";
+    }
+    submit.disabled = false; submit.textContent = "Sign in";
+  });
+</script>
+</body>
+</html>

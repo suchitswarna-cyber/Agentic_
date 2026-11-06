@@ -69,7 +69,7 @@ SSC can run on [Render](https://render.com)'s free plan straight from this GitHu
 2. Click **New → Blueprint**, pick the `Agentic_` repo, and click **Apply**. Render reads `render.yaml`.
 3. When asked, fill in:
    - `GEMINI_API_KEY`: your Google key (or delete it and add `ANTHROPIC_API_KEY` for Claude)
-   - `APP_PASSWORD`: a password you make up. The page asks for it, and any username works.
+   - `APP_PASSWORD`: a password you make up. SSC shows a sign-in page that asks for it.
 4. Wait for the build to finish, then open the `https://ssc-….onrender.com` address Render shows.
 
 Good to know about the free plan:

@@ -60,7 +60,7 @@
   }
   .title { font-weight: 650; font-size: 16px; }
   .mode { font-size: 12px; color: var(--muted); }
-  header button { margin-left: auto; }
+  .actions { margin-left: auto; display: flex; gap: 8px; }
 
   button {
     font: inherit; font-size: 14px;
@@ -145,7 +145,10 @@
     <div class="title">SSC</div>
     <div class="mode" id="mode">connecting…</div>
   </div>
-  <button id="reset" type="button">New chat</button>
+  <div class="actions">
+    <button id="reset" type="button">New chat</button>
+    <button id="signout" type="button" hidden>Sign out</button>
+  </div>
 </header>
 
 <main id="scroller">
@@ -186,8 +189,12 @@
   let pending = [];  // attachments waiting to be sent: {name, type, data, url}
   const MAX_FILE = 10 * 1024 * 1024;
 
-  fetch("/api/info").then(r => r.json()).then(d => {
+  fetch("/api/info").then(r => {
+    if (r.status === 401) { location.replace("/login"); throw new Error("signed out"); }
+    return r.json();
+  }).then(d => {
     document.getElementById("mode").textContent = d.mode;
+    document.getElementById("signout").hidden = !d.sign_in;
   }).catch(() => {
     document.getElementById("mode").textContent = "server not running";
   });
@@ -271,6 +278,7 @@
       });
       const data = await res.json();
       typing.remove();
+      if (data.signed_out) { location.replace("/login"); return; }
       if (data.error) addMessage("bot error", escapeHtml(data.error));
       else addMessage("bot", renderMarkdown(data.answer));
     } catch {
@@ -338,6 +346,10 @@
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(input.value); }
   });
   document.querySelectorAll(".suggestions button").forEach(b => b.addEventListener("click", () => ask(b.textContent)));
+  document.getElementById("signout").addEventListener("click", async () => {
+    await fetch("/api/logout", {method: "POST"}).catch(() => {});
+    location.replace("/login");
+  });
   document.getElementById("reset").addEventListener("click", async () => {
     await fetch("/api/reset", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({session})}).catch(() => {});
     location.reload();

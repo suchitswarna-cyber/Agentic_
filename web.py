@@ -3,16 +3,19 @@
 Usage:
     ./run_web.sh           # then open http://localhost:8000
 
-Online (Render), set APP_PASSWORD so only you can use it; the browser then
-asks for it. Any username works.
+Online (Render), set APP_PASSWORD so only you can use it: the page then shows
+a sign-in screen, and a cookie keeps you signed in for 30 days.
 """
 
+import hashlib
 import hmac
 import os
 import threading
+import time
+from datetime import timedelta
 
 import anthropic
-from flask import Flask, Response, jsonify, request, send_from_directory
+from flask import Flask, Response, jsonify, redirect, request, send_from_directory, session
 
 from attachments import parse
 from gemini_agent import errors as genai_errors
@@ -24,17 +27,56 @@ app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # uploads arrive as base64 
 MODE = provider_name()
 PASSWORD = os.environ.get("APP_PASSWORD", "")
 
+# Sign-in cookies are signed with a key made from the password, so they survive
+# restarts, and changing the password signs everyone out.
+app.secret_key = hashlib.sha256(f"ssc-session:{PASSWORD}".encode()).hexdigest()
+app.config.update(
+    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=bool(os.environ.get("RENDER")),  # Render serves https
+)
+OPEN_PATHS = {"/login", "/api/login", "/favicon.ico"}
+
+
+def _signed_in() -> bool:
+    return not PASSWORD or session.get("signed_in") is True
+
 
 @app.before_request
-def require_password():
-    if not PASSWORD:
-        if os.environ.get("RENDER"):  # never run open to the whole internet
-            return Response("Set APP_PASSWORD in Render's Environment settings first.", 503)
+def require_sign_in():
+    if not PASSWORD and os.environ.get("RENDER"):  # never run open to the whole internet
+        return Response("Set APP_PASSWORD in Render's Environment settings first.", 503)
+    if _signed_in() or request.path in OPEN_PATHS:
         return None
-    auth = request.authorization
-    if auth and hmac.compare_digest((auth.password or "").encode(), PASSWORD.encode()):
-        return None
-    return Response("Password required.", 401, {"WWW-Authenticate": 'Basic realm="SSC"'})
+    if request.path.startswith("/api/"):
+        return jsonify(error="Please sign in again.", signed_out=True), 401
+    return redirect("/login")
+
+
+@app.get("/login")
+def login_page():
+    if PASSWORD and _signed_in():
+        return redirect("/")
+    return send_from_directory("static", "login.html")
+
+
+@app.post("/api/login")
+def login():
+    password = (request.get_json(silent=True) or {}).get("password") or ""
+    if PASSWORD and hmac.compare_digest(password.encode(), PASSWORD.encode()):
+        session.clear()
+        session.permanent = True
+        session["signed_in"] = True
+        return jsonify(ok=True)
+    time.sleep(1)  # slow down password guessing
+    return jsonify(error="Wrong password. Try again."), 401
+
+
+@app.post("/api/logout")
+def logout():
+    session.clear()
+    return jsonify(ok=True)
 
 # One agent (and conversation) per browser tab, keyed by an id the page sends.
 _agents: dict = {}
@@ -55,7 +97,7 @@ def index():
 
 @app.get("/api/info")
 def info():
-    return jsonify(mode=MODE)
+    return jsonify(mode=MODE, sign_in=bool(PASSWORD))
 
 
 @app.post("/api/chat")
