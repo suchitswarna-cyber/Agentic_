@@ -7,8 +7,6 @@ until it has an answer. Gemini's free tier has daily limits.
 import os
 import warnings
 
-import httpx
-
 # The Google libraries warn loudly about this Mac's older Python; the bot works fine.
 warnings.filterwarnings("ignore", category=FutureWarning, module="google")
 warnings.filterwarnings("ignore", message="urllib3 v2 only supports OpenSSL")
@@ -104,7 +102,9 @@ class GeminiAgent:
             except errors.APIError as e:
                 if e.code not in BUSY_CODES or last:
                     raise
-            except httpx.TimeoutException:
+            except Exception as e:
+                if not _is_timeout(e):
+                    raise
                 if last:
                     raise TimeoutError("Google took too long to answer. Try again in a minute.")
             # A failed send isn't added to the history, so the next model
@@ -117,6 +117,11 @@ class GeminiAgent:
 
     def reset(self):
         self._start(MODELS[0])
+
+
+def _is_timeout(e) -> bool:
+    """True for a network time-out, whichever HTTP library Google's SDK uses."""
+    return isinstance(e, TimeoutError) or "timeout" in type(e).__name__.lower()
 
 
 def _text(response) -> str:
