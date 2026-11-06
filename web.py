@@ -2,12 +2,17 @@
 
 Usage:
     ./run_web.sh           # then open http://localhost:8000
+
+Online (Render), set APP_PASSWORD so only you can use it; the browser then
+asks for it. Any username works.
 """
 
+import hmac
+import os
 import threading
 
 import anthropic
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, Response, jsonify, request, send_from_directory
 
 from attachments import parse
 from gemini_agent import errors as genai_errors
@@ -17,6 +22,19 @@ app = Flask(__name__, static_folder="static")
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # uploads arrive as base64 JSON
 
 MODE = provider_name()
+PASSWORD = os.environ.get("APP_PASSWORD", "")
+
+
+@app.before_request
+def require_password():
+    if not PASSWORD:
+        if os.environ.get("RENDER"):  # never run open to the whole internet
+            return Response("Set APP_PASSWORD in Render's Environment settings first.", 503)
+        return None
+    auth = request.authorization
+    if auth and hmac.compare_digest((auth.password or "").encode(), PASSWORD.encode()):
+        return None
+    return Response("Password required.", 401, {"WWW-Authenticate": 'Basic realm="SSC"'})
 
 # One agent (and conversation) per browser tab, keyed by an id the page sends.
 _agents: dict = {}
@@ -88,5 +106,6 @@ def reset():
 
 
 if __name__ == "__main__":
-    print(f"SSC web ({MODE}) running at http://localhost:8000")
-    app.run(host="127.0.0.1", port=8000, threaded=True)
+    port = int(os.environ.get("PORT", 8000))
+    print(f"SSC web ({MODE}) running at http://localhost:{port}")
+    app.run(host="127.0.0.1", port=port, threaded=True)

@@ -1,0 +1,15 @@
+# Render deploys SSC straight from this GitHub repo: render.com -> New -> Blueprint.
+# Render asks you for the two secret values when you create it.
+services:
+  - type: web
+    name: ssc
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    # One worker, because each chat's history lives in that worker's memory.
+    startCommand: gunicorn web:app --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 240
+    envVars:
+      - key: GEMINI_API_KEY   # your Google key (or set ANTHROPIC_API_KEY for Claude)
+        sync: false
+      - key: APP_PASSWORD     # the password for your SSC page
+        sync: false

@@ -61,7 +61,22 @@ pip install -r requirements.txt
 ./add_key.sh        # paste your Google or Claude key; it's saved to .env (never committed)
 ```
 
-## Run it
+## Run it online (always on, no computer needed)
+
+SSC can run on [Render](https://render.com)'s free plan straight from this GitHub repo. It updates by itself whenever you push to `main`.
+
+1. Sign up at **render.com** using **Sign in with GitHub**, and allow Render to see this repo.
+2. Click **New → Blueprint**, pick the `Agentic_` repo, and click **Apply**. Render reads `render.yaml`.
+3. When asked, fill in:
+   - `GEMINI_API_KEY`: your Google key (or delete it and add `ANTHROPIC_API_KEY` for Claude)
+   - `APP_PASSWORD`: a password you make up. The page asks for it, and any username works.
+4. Wait for the build to finish, then open the `https://ssc-….onrender.com` address Render shows.
+
+Good to know about the free plan:
+- It pauses after about 15 minutes with no visitors, so the first message after a pause takes about a minute.
+- Saved memory and files are wiped whenever it restarts or you push an update.
+
+## Run it on your computer
 
 ### In your browser
 
