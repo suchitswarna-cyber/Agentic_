@@ -122,6 +122,13 @@
   #pending button { border: 0; background: none; padding: 0 5px; color: var(--muted); font-size: 16px; line-height: 1; }
   form button.attach { background: none; color: var(--muted); font-size: 20px; padding: 5px 9px; font-weight: 400; border-radius: 999px; }
   form button.attach:hover { color: var(--text); }
+  form button.mic {
+    width: 40px; height: 40px; padding: 0; flex: none; display: grid; place-items: center;
+    background: none; color: var(--muted); border-radius: 999px; font-weight: 400;
+  }
+  form button.mic:hover { color: var(--text); }
+  form button.mic.listening { background: var(--accent); color: var(--accent-text); animation: listening 1.2s infinite; }
+  @keyframes listening { 0% { box-shadow: 0 0 0 0 var(--muted); } 100% { box-shadow: 0 0 0 10px transparent; } }
   body.dragging main { outline: 2px dashed var(--accent); outline-offset: -8px; }
 
   .typing { display: inline-flex; gap: 4px; padding: 14px 16px; }
@@ -208,6 +215,9 @@
     <input id="pick-files" type="file" multiple hidden accept=".pdf,.txt,.md,.csv,.json,.py,.js,.ts,.html,.css,.xml,.yaml,.yml,.log">
     <input id="pick-other" type="file" multiple hidden>
     <textarea id="input" rows="1" placeholder="At your service…" autofocus></textarea>
+    <button class="mic" id="mic" type="button" aria-label="Speak" title="Speak" aria-pressed="false" hidden>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+    </button>
     <button id="send" type="submit" aria-label="Send" title="Send">
       <svg class="arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
       <span class="thinking-dots" aria-hidden="true"><span></span><span></span><span></span></span>
@@ -405,6 +415,45 @@
     e.preventDefault(); dragDepth = 0; document.body.classList.remove("dragging");
     addFiles(e.dataTransfer.files);
   });
+
+  // Voice typing with the browser's built-in speech recognition (Chrome, Edge, Safari).
+  const mic = document.getElementById("mic");
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (Recognition) {
+    mic.hidden = false;
+    let recognizer = null;
+    const setListening = on => {
+      mic.classList.toggle("listening", on);
+      mic.setAttribute("aria-pressed", String(on));
+      mic.title = on ? "Stop listening" : "Speak";
+      mic.setAttribute("aria-label", mic.title);
+      input.placeholder = on ? "Listening…" : "At your service…";
+    };
+    mic.addEventListener("click", () => {
+      if (recognizer) { recognizer.stop(); return; }
+      recognizer = new Recognition();
+      recognizer.lang = navigator.language || "en-US";
+      recognizer.interimResults = true;
+      const before = input.value.trim() ? input.value.trimEnd() + " " : "";
+      recognizer.onresult = e => {
+        input.value = before + [...e.results].map(r => r[0].transcript).join("");
+        autosize();
+      };
+      recognizer.onerror = e => {
+        const messages = {
+          "not-allowed": "Microphone access is blocked. Allow the microphone for this site in your browser settings to use voice.",
+          "service-not-allowed": "Microphone access is blocked. Allow the microphone for this site in your browser settings to use voice.",
+          "no-speech": "I didn't hear anything. Tap the microphone and try again.",
+          "audio-capture": "No microphone was found on this device.",
+          "network": "Voice typing isn't available in this browser. Try Chrome, Edge or Safari.",
+        };
+        if (messages[e.error]) addMessage("bot error", escapeHtml(messages[e.error]));
+      };
+      recognizer.onend = () => { recognizer = null; setListening(false); input.focus(); };
+      recognizer.start();
+      setListening(true);
+    });
+  }
 
   function autosize() {
     input.style.height = "auto";
