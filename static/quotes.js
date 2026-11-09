@@ -1,22 +1,23 @@
-// A short quote at the bottom of the page, different each time SSC opens.
+// A short motivational quote under the message box when SSC opens.
+// It goes away once the chat starts (see addMessage in index.html).
 (function () {
   const QUOTES = [
     ["Arise, awake, and stop not till the goal is reached.", "Swami Vivekananda"],
     ["Dream, dream, dream. Dreams transform into thoughts and thoughts result in action.", "A. P. J. Abdul Kalam"],
-    ["The journey of a thousand miles begins with one step.", "Lao Tzu"],
-    ["Well done is better than well said.", "Benjamin Franklin"],
-    ["Energy and persistence conquer all things.", "Benjamin Franklin"],
-    ["Do what you can, with what you have, where you are.", "Theodore Roosevelt"],
-    ["The best way out is always through.", "Robert Frost"],
-    ["Act as if what you do makes a difference. It does.", "William James"],
-    ["It always seems impossible until it's done.", "Nelson Mandela"],
-    ["Knowledge is power.", "Francis Bacon"],
-    ["Fortune favours the bold.", "Virgil"],
-    ["Well begun is half done.", "Aristotle"],
-    ["Nothing will work unless you do.", "Maya Angelou"],
+    ["If you want to shine like a sun, first burn like a sun.", "A. P. J. Abdul Kalam"],
     ["The secret of getting ahead is getting started.", "Mark Twain"],
-    ["Patience is bitter, but its fruit is sweet.", "Jean-Jacques Rousseau"],
-    ["Whatever you are, be a good one.", "Abraham Lincoln"],
+    ["It always seems impossible until it's done.", "Nelson Mandela"],
+    ["Believe you can and you're halfway there.", "Theodore Roosevelt"],
+    ["Do what you can, with what you have, where you are.", "Theodore Roosevelt"],
+    ["It does not matter how slowly you go as long as you do not stop.", "Confucius"],
+    ["Act as if what you do makes a difference. It does.", "William James"],
+    ["Energy and persistence conquer all things.", "Benjamin Franklin"],
+    ["Nothing will work unless you do.", "Maya Angelou"],
+    ["The best way out is always through.", "Robert Frost"],
+    ["Hard work beats talent when talent doesn't work hard.", "Tim Notke"],
+    ["The journey of a thousand miles begins with one step.", "Lao Tzu"],
+    ["Well begun is half done.", "Aristotle"],
+    ["Fortune favours the bold.", "Virgil"],
   ];
   const el = document.getElementById("quote");
   if (!el) return;

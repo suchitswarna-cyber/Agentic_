@@ -418,6 +418,7 @@
 
   function addMessage(role, html, files = []) {
     document.getElementById("welcome")?.remove();
+    document.getElementById("quote")?.remove();
     const msg = document.createElement("div");
     msg.className = `msg ${role}`;
     if (files.length) {
