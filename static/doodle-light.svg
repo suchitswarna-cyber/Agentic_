@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="280" height="280" viewBox="0 0 280 280">
+<g fill="none" stroke="#000000" stroke-opacity=".10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- SSC lettering -->
+  <g fill="#000000" fill-opacity=".08" stroke="none" font-family="Marker Felt, Chalkboard SE, Comic Sans MS, Segoe Print, cursive" font-weight="700">
+    <text x="16" y="66" font-size="38" transform="rotate(-12 16 66)">SSC</text>
+    <text x="168" y="236" font-size="24" transform="rotate(10 168 236)">ssc</text>
+    <text x="196" y="132" font-size="16" transform="rotate(-6 196 132)">SSC</text>
+  </g>
+  <!-- chat bubble with dots -->
+  <path d="M112 92h48a10 10 0 0 1 10 10v20a10 10 0 0 1-10 10h-28l-11 10v-10h-9a10 10 0 0 1-10-10v-20a10 10 0 0 1 10-10z"/>
+  <circle cx="125" cy="112" r="1.6" fill="#000000" fill-opacity=".10"/><circle cx="136" cy="112" r="1.6" fill="#000000" fill-opacity=".10"/><circle cx="147" cy="112" r="1.6" fill="#000000" fill-opacity=".10"/>
+  <!-- star -->
+  <path d="M222 24l6 12 13 2-9 9 2 13-12-6-12 6 2-13-9-9 13-2z"/>
+  <!-- sun -->
+  <circle cx="54" cy="214" r="10"/>
+  <path d="M54 196v-6M54 238v-6M36 214h-6M78 214h-6M41 201l-4-4M71 231l-4-4M41 227l-4 4M71 197l-4 4"/>
+  <!-- cloud -->
+  <path d="M96 182h40a10 10 0 0 0 0-20 14 14 0 0 0-26-6 10 10 0 0 0-14 26z"/>
+  <!-- squiggles -->
+  <path d="M18 128q8-10 16 0t16 0t16 0"/>
+  <path d="M206 186q6-8 12 0t12 0"/>
+  <!-- sparkles -->
+  <path d="M250 92v14M243 99h14"/>
+  <path d="M86 26v10M81 31h10"/>
+  <path d="M150 254v8M146 258h8"/>
+  <!-- lightning bolt -->
+  <path d="M24 158l-8 14h10l-6 13"/>
+  <!-- tiny circles -->
+  <circle cx="186" cy="62" r="4"/>
+  <circle cx="262" cy="214" r="3"/>
+  <!-- paperclip -->
+  <path d="M246 150v22a7 7 0 0 1-14 0v-26a5 5 0 0 1 10 0v24"/>
+</g>
+</svg>
