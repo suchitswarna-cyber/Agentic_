@@ -1,7 +1,8 @@
 """Files and pictures the user attaches to a message.
 
 The web page sends each one as {name, type, data} with base64 data. We sort
-them into pictures, PDFs and text files so each goes to Claude the right way.
+them into pictures, videos, PDFs and text files so each goes to the AI the
+right way. Videos only work with Gemini; Claude can't watch them.
 """
 
 import base64
@@ -13,12 +14,13 @@ MAX_BYTES = 10 * 1024 * 1024
 
 IMAGE_EXTS = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
               "gif": "image/gif", "webp": "image/webp"}
+VIDEO_EXTS = {"mp4": "video/mp4", "m4v": "video/mp4", "mov": "video/quicktime", "webm": "video/webm"}
 
 
 class Attachment:
     def __init__(self, name: str, kind: str, mime: str, data: bytes, text: str = ""):
         self.name = name
-        self.kind = kind  # "image", "pdf" or "text"
+        self.kind = kind  # "image", "video", "pdf" or "text"
         self.mime = mime
         self.data = data
         self.text = text
@@ -42,6 +44,8 @@ def parse(raw: dict) -> Attachment:
     ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
     if ext in IMAGE_EXTS or mime in IMAGE_EXTS.values():
         return Attachment(name, "image", IMAGE_EXTS.get(ext, mime), data)
+    if ext in VIDEO_EXTS or mime in VIDEO_EXTS.values():
+        return Attachment(name, "video", VIDEO_EXTS.get(ext, mime), data)
     if ext == "pdf" or mime == "application/pdf":
         try:
             pages = PdfReader(io.BytesIO(data)).pages
@@ -52,11 +56,13 @@ def parse(raw: dict) -> Attachment:
     try:
         return Attachment(name, "text", "text/plain", data, data.decode("utf-8"))
     except UnicodeDecodeError:
-        raise ValueError(f"Can't read '{name}'. Use a text, PDF or picture (PNG, JPG, GIF, WebP) file.")
+        raise ValueError(f"Can't read '{name}'. Use a photo (PNG, JPG, GIF, WebP), video (MP4, MOV, WebM), PDF or text file.")
 
 
 def default_question(attachments) -> str:
     """What to ask when the user sends attachments with no message."""
+    if any(a.kind == "video" for a in attachments):
+        return "Describe this video."
     if any(a.kind == "image" for a in attachments):
         return "Describe this picture."
     return "Summarize the attached file."

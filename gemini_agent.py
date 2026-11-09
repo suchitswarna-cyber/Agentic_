@@ -67,7 +67,7 @@ class GeminiAgent:
         for a in attachments:
             if a.kind == "text":
                 parts.append(types.Part.from_text(text=f"Attached file '{a.name}':\n```\n{a.text}\n```"))
-            else:  # pictures and PDFs: Gemini reads them directly
+            else:  # pictures, videos and PDFs: Gemini reads them directly
                 parts.append(types.Part.from_bytes(data=a.data, mime_type=a.mime))
         parts.append(types.Part.from_text(text=user_input or default_question(attachments)))
 

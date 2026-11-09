@@ -110,6 +110,8 @@ def chat():
         return jsonify(error=str(e)), 400
     if not message and not attachments:
         return jsonify(error="Empty message"), 400
+    if MODE == "Claude" and any(a.kind == "video" for a in attachments):
+        return jsonify(error="Claude can't watch videos. Send a photo instead, or use a Google Gemini key."), 400
 
     agent = _get_agent(body.get("session", "default"))
     tool_calls = []

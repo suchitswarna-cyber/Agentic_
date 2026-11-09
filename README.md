@@ -86,11 +86,12 @@ Good to know about the free plan:
 
 Then open **http://localhost:8000**.
 
-Click 📎 (or drag a file onto the page, or paste a screenshot) to ask about a file or picture:
+Click 📎 and choose **Photos & videos**, **Files** or **Other** (or drag a file onto the page, or paste a screenshot) to ask about it:
 
 - **Text files** (TXT, MD, CSV, JSON, code): the AI reads the whole file.
 - **PDFs**: read directly, including tables and charts.
 - **Pictures** (PNG, JPG, GIF, WebP): the AI looks at them directly.
+- **Videos** (MP4, MOV, WebM): Gemini watches them. Claude can't read videos.
 - Up to 10 MB per file.
 
 ### In the terminal

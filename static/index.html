@@ -98,7 +98,7 @@
   .error .bubble { color: var(--error); }
 
   .files { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; justify-content: flex-end; }
-  .files img { max-width: 220px; max-height: 220px; border-radius: 10px; border: 1px solid var(--border); display: block; }
+  .files img, .files video { max-width: 220px; max-height: 220px; border-radius: 10px; border: 1px solid var(--border); display: block; }
   .file {
     display: inline-flex; align-items: center; gap: 6px; font-size: 13px;
     background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 5px 9px;
@@ -108,7 +108,7 @@
   #pending { max-width: 760px; margin: 0 auto 8px; justify-content: flex-start; }
   #pending:empty { display: none; }
   #pending .file { padding: 4px 4px 4px 6px; }
-  #pending img { width: 36px; height: 36px; object-fit: cover; border-radius: 5px; border: 0; }
+  #pending img, #pending video { width: 36px; height: 36px; object-fit: cover; border-radius: 5px; border: 0; }
   #pending button { border: 0; background: none; padding: 0 5px; color: var(--muted); font-size: 16px; line-height: 1; }
   form button.attach { background: none; color: var(--muted); font-size: 20px; padding: 4px 8px; font-weight: 400; }
   form button.attach:hover { color: var(--text); }
@@ -125,6 +125,7 @@
 
   footer { background: var(--bg); padding: 8px 16px 16px; }
   form {
+    position: relative;
     max-width: 760px; margin: 0 auto; display: flex; gap: 8px;
     background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 8px;
   }
@@ -135,6 +136,20 @@
   }
   form button { background: var(--accent); color: var(--accent-text); border: 0; font-weight: 600; padding: 8px 16px; }
   form button:disabled { opacity: .5; cursor: default; }
+  .attach-menu {
+    position: absolute; left: 8px; bottom: calc(100% + 8px); z-index: 5;
+    min-width: 230px; padding: 6px; display: flex; flex-direction: column;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+  }
+  .attach-menu[hidden] { display: none; }
+  form .attach-menu button {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    background: none; color: var(--text); font-weight: 400; padding: 9px 10px; border-radius: 8px;
+  }
+  form .attach-menu button:hover, form .attach-menu button:focus-visible { background: var(--code); outline: none; }
+  .attach-menu .icon { font-size: 18px; width: 22px; text-align: center; }
+  .attach-menu small { display: block; color: var(--muted); font-size: 12px; }
   .hint { max-width: 760px; margin: 6px auto 0; font-size: 12px; color: var(--muted); text-align: center; }
 </style>
 </head>
@@ -171,12 +186,19 @@
 <footer>
   <div class="files" id="pending"></div>
   <form id="form">
-    <button class="attach" id="attach" type="button" title="Attach files or pictures" aria-label="Attach files or pictures">📎</button>
-    <input id="picker" type="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp,.pdf,.txt,.md,.csv,.json,.py,.js,.ts,.html,.css,.xml,.yaml,.yml,.log">
+    <button class="attach" id="attach" type="button" title="Attach" aria-label="Attach" aria-haspopup="menu" aria-expanded="false" aria-controls="attach-menu">📎</button>
+    <div class="attach-menu" id="attach-menu" role="menu" hidden>
+      <button type="button" role="menuitem" data-picker="pick-media"><span class="icon">🖼️</span><span>Photos &amp; videos<small>PNG, JPG, GIF, WebP, MP4, MOV</small></span></button>
+      <button type="button" role="menuitem" data-picker="pick-files"><span class="icon">📄</span><span>Files<small>PDF, text, CSV, code</small></span></button>
+      <button type="button" role="menuitem" data-picker="pick-other"><span class="icon">📁</span><span>Other<small>Any other file</small></span></button>
+    </div>
+    <input id="pick-media" type="file" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/quicktime,video/webm">
+    <input id="pick-files" type="file" multiple hidden accept=".pdf,.txt,.md,.csv,.json,.py,.js,.ts,.html,.css,.xml,.yaml,.yml,.log">
+    <input id="pick-other" type="file" multiple hidden>
     <textarea id="input" rows="1" placeholder="Message SSC…" autofocus></textarea>
     <button id="send" type="submit">Send</button>
   </form>
-  <div class="hint">Enter to send · Shift+Enter for a new line · 📎 or drop files and pictures to ask about them</div>
+  <div class="hint">Enter to send · Shift+Enter for a new line · 📎 or drop photos, videos and files to ask about them</div>
 </footer>
 
 <script>
@@ -227,6 +249,12 @@
   }
 
   function fileTile(f) {
+    if (f.type.startsWith("video/")) {
+      const video = document.createElement("video");
+      video.src = f.url; video.title = f.name; video.muted = true;
+      video.playsInline = true; video.preload = "metadata";
+      return video;
+    }
     if (f.type.startsWith("image/")) {
       const img = document.createElement("img");
       img.src = f.url; img.alt = f.name; img.title = f.name;
@@ -247,7 +275,11 @@
     if (files.length) {
       const row = document.createElement("div");
       row.className = "files";
-      files.forEach(f => row.appendChild(fileTile(f)));
+      files.forEach(f => {
+        const tile = fileTile(f);
+        if (tile.tagName === "VIDEO") tile.controls = true;
+        row.appendChild(tile);
+      });
       msg.appendChild(row);
     }
     if (html === null) { messages.appendChild(msg); scroller.scrollTop = scroller.scrollHeight; return msg; }
@@ -294,7 +326,7 @@
     pending.forEach((f, i) => {
       const chip = document.createElement("div");
       chip.className = "file";
-      if (f.type.startsWith("image/")) chip.appendChild(fileTile(f));
+      if (f.type.startsWith("image/") || f.type.startsWith("video/")) chip.appendChild(fileTile(f));
       const name = document.createElement("span");
       name.textContent = f.name;
       const x = document.createElement("button");
@@ -319,9 +351,32 @@
     input.focus();
   }
 
-  const picker = document.getElementById("picker");
-  document.getElementById("attach").addEventListener("click", () => picker.click());
-  picker.addEventListener("change", () => { addFiles(picker.files); picker.value = ""; });
+  const attachBtn = document.getElementById("attach");
+  const attachMenu = document.getElementById("attach-menu");
+  function setMenu(open) {
+    attachMenu.hidden = !open;
+    attachBtn.setAttribute("aria-expanded", String(open));
+    if (open) attachMenu.querySelector("button").focus();
+  }
+  attachBtn.addEventListener("click", () => setMenu(attachMenu.hidden));
+  attachMenu.querySelectorAll("button").forEach(item => item.addEventListener("click", () => {
+    setMenu(false);
+    document.getElementById(item.dataset.picker).click();
+  }));
+  document.addEventListener("click", e => {
+    if (!attachMenu.hidden && !attachMenu.contains(e.target) && e.target !== attachBtn) setMenu(false);
+  });
+  attachMenu.addEventListener("keydown", e => {
+    const items = [...attachMenu.querySelectorAll("button")];
+    const i = items.indexOf(document.activeElement);
+    if (e.key === "Escape") { setMenu(false); attachBtn.focus(); }
+    if (e.key === "ArrowDown") { e.preventDefault(); items[(i + 1) % items.length].focus(); }
+    if (e.key === "ArrowUp") { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+  });
+  ["pick-media", "pick-files", "pick-other"].forEach(id => {
+    const input = document.getElementById(id);
+    input.addEventListener("change", () => { addFiles(input.files); input.value = ""; });
+  });
   input.addEventListener("paste", e => {
     const files = [...e.clipboardData.files];
     if (files.length) { e.preventDefault(); addFiles(files); }
