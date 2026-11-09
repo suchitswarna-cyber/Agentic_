@@ -48,7 +48,7 @@ def _signed_in() -> bool:
 def require_sign_in():
     if not PASSWORD and os.environ.get("RENDER"):  # never run open to the whole internet
         return Response("Set APP_PASSWORD in Render's Environment settings first.", 503)
-    if _signed_in() or request.path in OPEN_PATHS or request.path.startswith("/static/doodle-"):
+    if _signed_in() or request.path in OPEN_PATHS or request.path.startswith("/static/doodle-") or request.path == "/static/quotes.js":
         return None
     if request.path.startswith("/api/"):
         return jsonify(error="Please sign in again.", signed_out=True), 401

@@ -237,6 +237,9 @@
   .ringing button { border-radius: 999px; }
   .ringing #stop-alarm { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
 
+  .quote { width: fit-content; background: var(--bg); padding: 4px 12px; border-radius: 10px; max-width: 560px; margin: 12px auto 0; text-align: center; font-size: 13px; line-height: 1.5; color: var(--muted); }
+  .quote .q-text { font-style: italic; }
+  .quote .q-author { white-space: nowrap; font-weight: 600; }
   .attach-menu {
     position: absolute; left: 8px; bottom: calc(100% + 8px); z-index: 5;
     min-width: 230px; padding: 6px; display: flex; flex-direction: column;
@@ -343,6 +346,7 @@
       <span class="thinking-dots" aria-hidden="true"><span></span><span></span><span></span></span>
     </button>
   </form>
+  <p class="quote" id="quote" aria-label="Quote of the moment"></p>
 </footer>
 
 <script>
@@ -819,5 +823,6 @@
   setInterval(() => { checkDue(false); tick(); }, 1000);
   window.addEventListener("storage", e => { if (e.key === DAY_KEY) { try { day = JSON.parse(e.newValue) || day; renderDay(); } catch {} } });
 </script>
+<script src="/static/quotes.js"></script>
 </body>
 </html>
