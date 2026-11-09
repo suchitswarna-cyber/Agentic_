@@ -77,9 +77,7 @@
 
   .welcome { text-align: center; padding: 40px 0 8px; }
   .welcome h1 { font-size: 24px; margin: 0 0 6px; }
-  .welcome p { color: var(--muted); margin: 0 0 20px; }
-  .suggestions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-  .suggestions button { border-radius: 999px; font-size: 13.5px; }
+  .welcome p { color: var(--muted); margin: 0; }
 
   .msg { display: flex; flex-direction: column; max-width: 85%; }
   .msg.user { align-self: flex-end; align-items: flex-end; }
@@ -171,14 +169,6 @@
     <div class="welcome" id="welcome">
       <h1>Hi, I'm SSC</h1>
       <p>An AI agent that uses tools to get things done.</p>
-      <div class="suggestions">
-        <button>What's the weather in Hyderabad?</button>
-        <button>Tell me about the Eiffel Tower</button>
-        <button>What's 18% of 2,340?</button>
-        <button>What time is it in New York?</button>
-        <button>My name is Sam, remember that</button>
-        <button>Write a shopping list to list.md</button>
-      </div>
     </div>
   </div>
 </main>
@@ -400,7 +390,6 @@
   input.addEventListener("keydown", e => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(input.value); }
   });
-  document.querySelectorAll(".suggestions button").forEach(b => b.addEventListener("click", () => ask(b.textContent)));
   document.getElementById("signout").addEventListener("click", async () => {
     await fetch("/api/logout", {method: "POST"}).catch(() => {});
     location.replace("/login");
