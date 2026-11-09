@@ -215,6 +215,20 @@
     padding: 16px; display: flex; align-items: center; gap: 12px;
   }
   .ringing[hidden] { display: none; }
+
+  /* Goodbye screen shown on Sign out */
+  .goodbye {
+    position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; text-align: center;
+    background-color: var(--bg); background-image: inherit; background-size: 280px 280px;
+    animation: fade-in .35s ease-out;
+  }
+  .goodbye[hidden] { display: none; }
+  .goodbye h2 { font-size: 34px; font-weight: 750; letter-spacing: -.02em; margin: 0 0 8px; }
+  .goodbye p { color: var(--muted); font-weight: 600; margin: 0; }
+  .goodbye .wave { font-size: 44px; display: inline-block; animation: wave 1s ease-in-out 2; transform-origin: 70% 70%; }
+  @keyframes wave { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(18deg); } 75% { transform: rotate(-10deg); } }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  #greeting.fade { animation: fade-in .5s ease-out; }
   .ringing .bell { font-size: 28px; animation: shake .5s infinite; }
   @keyframes shake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-15deg); } 75% { transform: rotate(15deg); } }
   .ringing .what { flex: 1; min-width: 0; }
@@ -288,6 +302,14 @@
   <div class="what"><strong id="ring-label"></strong><small id="ring-time"></small></div>
   <button id="snooze-alarm" type="button">Snooze 5 min</button>
   <button id="stop-alarm" type="button">Stop</button>
+</div>
+
+<div class="goodbye" id="goodbye" role="status" aria-live="polite" hidden>
+  <div>
+    <div class="wave" aria-hidden="true">👋</div>
+    <h2>See you again, Suchit</h2>
+    <p>Signing you out…</p>
+  </div>
 </div>
 
 <main id="scroller">
@@ -569,7 +591,11 @@
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(input.value); }
   });
   document.getElementById("signout").addEventListener("click", async () => {
-    await fetch("/api/logout", {method: "POST"}).catch(() => {});
+    document.getElementById("goodbye").hidden = false;
+    await Promise.all([
+      fetch("/api/logout", {method: "POST"}).catch(() => {}),
+      new Promise(r => setTimeout(r, 1800)),  // long enough to read the goodbye
+    ]);
     location.replace("/login");
   });
   document.getElementById("reset").addEventListener("click", async () => {
@@ -577,15 +603,38 @@
     location.reload();
   });
 
-  // Greeting follows the time of day.
+  // Greeting follows the time of day. After 30+ minutes away it says
+  // "Welcome back" for a few seconds first.
+  const SEEN_KEY = "ssc.lastSeen", AWAY_MS = 30 * 60 * 1000;
+  let welcomeUntil = 0;
   function greet() {
+    const el = document.getElementById("greeting");
+    if (!el || Date.now() < welcomeUntil) return;
     const h = new Date().getHours();
     const part = h < 6 ? "Good night" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
-    const el = document.getElementById("greeting");
-    if (el) el.textContent = `${part}, Suchit`;
+    const text = `${part}, Suchit`;
+    if (el.textContent !== text) { el.textContent = text; el.classList.remove("fade"); void el.offsetWidth; el.classList.add("fade"); }
   }
+  function lastSeen() { try { return Number(localStorage.getItem(SEEN_KEY)) || 0; } catch { return 0; } }
+  function markSeen() { try { localStorage.setItem(SEEN_KEY, String(Date.now())); } catch {} }
+  function welcomeBackIfAway() {
+    const seen = lastSeen(), el = document.getElementById("greeting");
+    if (el && seen && Date.now() - seen > AWAY_MS) {
+      el.textContent = "Welcome back, Suchit";
+      el.classList.add("fade");
+      welcomeUntil = Date.now() + 4000;
+      setTimeout(greet, 4000);
+    }
+    markSeen();
+  }
+  if (document.getElementById("greeting")) document.getElementById("greeting").textContent = "";
+  welcomeBackIfAway();
   greet();
-  setInterval(greet, 60 * 1000);
+  setInterval(() => { greet(); if (document.visibilityState === "visible") markSeen(); }, 60 * 1000);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") welcomeBackIfAway(); else markSeen();
+  });
+  window.addEventListener("pagehide", markSeen);
 
   // ---------- My day: alarms, reminders, timers and to-dos (saved in this browser) ----------
   const DAY_KEY = "ssc.day";
