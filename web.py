@@ -17,6 +17,7 @@ from datetime import timedelta
 import anthropic
 from flask import Flask, Response, jsonify, redirect, request, send_from_directory, session
 
+import daily
 from attachments import parse
 from gemini_agent import errors as genai_errors
 from providers import make_agent, provider_name
@@ -118,6 +119,9 @@ def chat():
     agent.on_tool_call = lambda name, args: tool_calls.append({"name": name, "args": args})
 
     try:
+        daily.begin(body.get("daily"), body.get("now"), body.get("tz_offset"))
+        if body.get("local_time"):  # so "tomorrow" and "in 2 hours" mean the user's own time
+            message = f"[{str(body['local_time'])[:60]}] {message}".strip()
         answer = agent.chat(message, attachments)
     except anthropic.AuthenticationError:
         return jsonify(error="Your Claude API key was rejected. Run ./add_key.sh again."), 401
@@ -138,7 +142,7 @@ def chat():
             return jsonify(error="Google's Gemini models are overloaded right now. Try again in a minute."), 503
         return jsonify(error=f"Google API error {e.code}: {e.message}"), 502
 
-    return jsonify(answer=answer, tools=tool_calls)
+    return jsonify(answer=answer, tools=tool_calls, daily=daily.current_state())
 
 
 @app.post("/api/reset")

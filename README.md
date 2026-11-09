@@ -41,6 +41,8 @@ SSC doesn't just answer — it **plans, calls tools, looks at the results, and k
 | `web_search` | Live web search (Claude only) |
 | `list_files` / `read_file` / `write_file` | File access, sandboxed to `./workspace` |
 | `remember` / `recall` | Long-term memory saved to `memory.json`, kept across runs |
+| `set_alarm` / `set_timer` / `list_alarms` / `cancel_alarm` | Alarms, reminders and timers that ring (with a notification) while the SSC page is open |
+| `add_task` / `list_tasks` / `complete_task` / `remove_task` | A to-do list, also shown in the **⏰ My day** panel |
 
 ## Setup
 

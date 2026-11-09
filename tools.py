@@ -16,6 +16,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from anthropic import beta_tool
 
+from daily import DAILY_TOOLS
+
 # All file tools are confined to this folder so the agent can't touch the rest of the disk.
 WORKSPACE = Path(__file__).parent / "workspace"
 WORKSPACE.mkdir(exist_ok=True)
@@ -237,6 +239,7 @@ LOCAL_TOOLS = [
     write_file,
     remember,
     recall,
+    *DAILY_TOOLS,
 ]
 
 ALL_TOOLS = LOCAL_TOOLS + [WEB_SEARCH]

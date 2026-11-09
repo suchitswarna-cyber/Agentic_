@@ -88,7 +88,8 @@
   }
 
   .welcome { text-align: center; padding: 40px 0 8px; }
-  .welcome h1 { font-size: 30px; margin: 0 0 8px; }
+  .welcome .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  .welcome h1 { font-size: 34px; font-weight: 750; letter-spacing: -.02em; line-height: 1.15; margin: 0 0 10px; }
   .welcome p { color: var(--muted); font-weight: 600; margin: 0 auto; max-width: 460px; }
 
   .msg { display: flex; flex-direction: column; max-width: 85%; }
@@ -164,6 +165,46 @@
   #send.thinking .thinking-dots { display: flex; }
   form button#send.thinking:disabled { opacity: 1; }
   @keyframes think { 0%, 80%, 100% { transform: translateY(0); opacity: .45; } 40% { transform: translateY(-4px); opacity: 1; } }
+  /* My day panel: alarms, reminders, timers and to-dos */
+  .day-panel {
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: 20; width: min(360px, 100%);
+    background: var(--panel); border-left: 2px solid var(--text); padding: 16px 18px 24px;
+    overflow-y: auto; box-shadow: -8px 0 24px rgba(0, 0, 0, .15);
+  }
+  .day-panel[hidden] { display: none; }
+  .day-panel .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .day-panel h2 { font-size: 18px; margin: 0; }
+  .day-panel h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 18px 0 8px; }
+  .day-panel ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .day-panel li { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
+  .day-panel li .what { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .day-panel li small { display: block; color: var(--muted); font-size: 12px; }
+  .day-panel li.done .what { text-decoration: line-through; color: var(--muted); }
+  .day-panel li button { border: 0; background: none; color: var(--muted); font-size: 18px; padding: 0 4px; line-height: 1; }
+  .day-panel li button:hover { color: var(--text); }
+  .day-panel input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
+  .day-panel .empty { color: var(--muted); font-size: 13px; }
+  .day-panel .notify { margin-top: 18px; width: 100%; }
+  .day-panel .note { color: var(--muted); font-size: 12px; margin-top: 14px; }
+  #day-btn .count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: 4px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: var(--accent-text); font-size: 11px; font-weight: 700; }
+  #day-btn .count:empty { display: none; }
+
+  /* Ringing alarm */
+  .ringing {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 30;
+    width: min(420px, calc(100% - 32px)); background: var(--panel); color: var(--text);
+    border: 2px solid var(--text); border-radius: 18px; box-shadow: 4px 4px 0 var(--text);
+    padding: 16px; display: flex; align-items: center; gap: 12px;
+  }
+  .ringing[hidden] { display: none; }
+  .ringing .bell { font-size: 28px; animation: shake .5s infinite; }
+  @keyframes shake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-15deg); } 75% { transform: rotate(15deg); } }
+  .ringing .what { flex: 1; min-width: 0; }
+  .ringing .what strong { display: block; font-size: 16px; overflow-wrap: anywhere; }
+  .ringing .what small { color: var(--muted); }
+  .ringing button { border-radius: 999px; }
+  .ringing #stop-alarm { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+
   .attach-menu {
     position: absolute; left: 8px; bottom: calc(100% + 8px); z-index: 5;
     min-width: 230px; padding: 6px; display: flex; flex-direction: column;
@@ -188,16 +229,38 @@
     <div class="mode" id="mode">connecting…</div>
   </div>
   <div class="actions">
+    <button id="day-btn" type="button" aria-controls="day-panel" aria-expanded="false" title="Alarms and to-dos">⏰ My day<span class="count" id="day-count"></span></button>
     <button id="reset" type="button">New chat</button>
     <button id="signout" type="button" hidden>Sign out</button>
   </div>
 </header>
 
+<aside class="day-panel" id="day-panel" aria-label="My day" hidden>
+  <div class="top">
+    <h2>My day</h2>
+    <button id="day-close" type="button" aria-label="Close">✕</button>
+  </div>
+  <h3>Alarms &amp; reminders</h3>
+  <ul id="alarm-list"></ul>
+  <h3>To-do</h3>
+  <ul id="todo-list"></ul>
+  <button class="notify" id="notify-btn" type="button" hidden>🔔 Turn on notifications</button>
+  <p class="note">Ask in the chat, e.g. "wake me up at 6:30", "set a 10 minute timer" or "add buy milk to my list". Alarms ring while this page is open, even in a background tab.</p>
+</aside>
+
+<div class="ringing" id="ringing" role="alertdialog" aria-live="assertive" aria-labelledby="ring-label" hidden>
+  <div class="bell" aria-hidden="true">⏰</div>
+  <div class="what"><strong id="ring-label"></strong><small id="ring-time"></small></div>
+  <button id="snooze-alarm" type="button">Snooze 5 min</button>
+  <button id="stop-alarm" type="button">Stop</button>
+</div>
+
 <main id="scroller">
   <div id="messages">
     <div class="welcome" id="welcome">
-      <h1>Hi Suchit, I'm your Personal Assistant</h1>
-      <p>I can check the weather and time, look things up, do maths, remember things about you, and read your photos, videos and files.</p>
+      <div class="eyebrow">Your Personal Assistant</div>
+      <h1 id="greeting">Hello, Suchit</h1>
+      <p>I can set alarms, reminders and timers, keep your to-do list, check the weather, look things up, do maths, and read your photos, videos and files.</p>
     </div>
   </div>
 </main>
@@ -331,11 +394,16 @@
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({message: text, session, attachments: files.map(({name, type, data}) => ({name, type, data}))}),
+        body: JSON.stringify({
+          message: text, session,
+          attachments: files.map(({name, type, data}) => ({name, type, data})),
+          daily: day, now: Date.now(), tz_offset: new Date().getTimezoneOffset(), local_time: localTimeText(),
+        }),
       });
       const data = await res.json();
       typing.remove();
       if (data.signed_out) { location.replace("/login"); return; }
+      if (data.daily) updateDay(data.daily);
       if (data.error) addMessage("bot error", escapeHtml(data.error));
       else addMessage("bot", renderMarkdown(data.answer));
     } catch {
@@ -473,6 +541,168 @@
     await fetch("/api/reset", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({session})}).catch(() => {});
     location.reload();
   });
+
+  // Greeting follows the time of day.
+  function greet() {
+    const h = new Date().getHours();
+    const part = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+    const el = document.getElementById("greeting");
+    if (el) el.textContent = `${part}, Suchit`;
+  }
+  greet();
+  setInterval(greet, 60 * 1000);
+
+  // ---------- My day: alarms, reminders, timers and to-dos (saved in this browser) ----------
+  const DAY_KEY = "ssc.day";
+  let day = {reminders: [], todos: []};
+  try { day = Object.assign(day, JSON.parse(localStorage.getItem(DAY_KEY)) || {}); } catch {}
+  const dayPanel = document.getElementById("day-panel");
+  const dayBtn = document.getElementById("day-btn");
+  const notifyBtn = document.getElementById("notify-btn");
+  let ringing = null, beepTimer = null, audioCtx = null;
+
+  function localTimeText() {
+    const now = new Date();
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+    return `Local time: ${now.toLocaleDateString("en-GB", {weekday: "long", day: "numeric", month: "long", year: "numeric"})}, ${now.toLocaleTimeString("en-GB", {hour: "2-digit", minute: "2-digit"})} ${tz}`.trim();
+  }
+  function saveDay() { try { localStorage.setItem(DAY_KEY, JSON.stringify(day)); } catch {} }
+  function whenText(ms) {
+    const d = new Date(ms), today = new Date();
+    const tomorrow = new Date(); tomorrow.setDate(today.getDate() + 1);
+    const time = d.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"});
+    if (d.toDateString() === today.toDateString()) return `${time} today`;
+    if (d.toDateString() === tomorrow.toDateString()) return `${time} tomorrow`;
+    return `${time}, ${d.toLocaleDateString([], {weekday: "short", day: "numeric", month: "short"})}`;
+  }
+  function updateDay(next) {
+    const before = day.reminders.length;
+    day = {reminders: next.reminders || [], todos: next.todos || []};
+    saveDay(); renderDay();
+    if (day.reminders.length > before) askForNotifications();
+  }
+  function renderDay() {
+    day.reminders.sort((a, b) => a.due - b.due);
+    const alarms = document.getElementById("alarm-list");
+    alarms.innerHTML = day.reminders.length ? "" : '<li class="empty">No alarms or reminders yet.</li>';
+    day.reminders.forEach(r => {
+      const li = document.createElement("li");
+      const repeat = {daily: " · every day", weekdays: " · weekdays"}[r.repeat] || "";
+      li.innerHTML = `<span aria-hidden="true">${r.kind === "timer" ? "⏳" : "⏰"}</span><span class="what"><span class="label"></span><small>${whenText(r.due)}${repeat}</small></span><button type="button" aria-label="Delete">✕</button>`;
+      li.querySelector(".label").textContent = r.label || "Alarm";
+      li.querySelector("button").addEventListener("click", () => { day.reminders = day.reminders.filter(x => x !== r); saveDay(); renderDay(); });
+      alarms.appendChild(li);
+    });
+    const todos = document.getElementById("todo-list");
+    todos.innerHTML = day.todos.length ? "" : '<li class="empty">Your to-do list is empty.</li>';
+    day.todos.forEach(t => {
+      const li = document.createElement("li");
+      li.className = t.done ? "done" : "";
+      li.innerHTML = `<input type="checkbox"><span class="what"></span><button type="button" aria-label="Delete">✕</button>`;
+      const box = li.querySelector("input");
+      box.checked = !!t.done; box.setAttribute("aria-label", `Done: ${t.text}`);
+      box.addEventListener("change", () => { t.done = box.checked; saveDay(); renderDay(); });
+      li.querySelector(".what").textContent = t.text;
+      li.querySelector("button").addEventListener("click", () => { day.todos = day.todos.filter(x => x !== t); saveDay(); renderDay(); });
+      todos.appendChild(li);
+    });
+    const open = day.reminders.length + day.todos.filter(t => !t.done).length;
+    document.getElementById("day-count").textContent = open || "";
+    notifyBtn.hidden = !("Notification" in window) || Notification.permission !== "default";
+  }
+  function setPanel(open) {
+    dayPanel.hidden = !open;
+    dayBtn.setAttribute("aria-expanded", String(open));
+    if (open) { renderDay(); document.getElementById("day-close").focus(); }
+  }
+  dayBtn.addEventListener("click", () => setPanel(dayPanel.hidden));
+  document.getElementById("day-close").addEventListener("click", () => { setPanel(false); dayBtn.focus(); });
+  dayPanel.addEventListener("keydown", e => { if (e.key === "Escape") { setPanel(false); dayBtn.focus(); } });
+  notifyBtn.addEventListener("click", askForNotifications);
+
+  function askForNotifications() {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().then(renderDay).catch(() => {});
+    }
+  }
+
+  // A gentle repeating beep made in the browser, so there's no sound file to load.
+  function beep() {
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      [0, 0.25].forEach(offset => {
+        const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+        osc.type = "sine"; osc.frequency.value = 880;
+        const t = audioCtx.currentTime + offset;
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(0.3, t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start(t); osc.stop(t + 0.22);
+      });
+    } catch {}
+  }
+  document.addEventListener("click", () => { try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); } catch {} }, {once: true});
+
+  function ring(r, missed) {
+    ringing = r;
+    document.getElementById("ring-label").textContent = (r.kind === "timer" ? "⏳ " : "") + (r.label || "Alarm");
+    document.getElementById("ring-time").textContent = missed ? `Missed at ${whenText(r.due)}` : (r.kind === "timer" ? "Time's up!" : whenText(r.due));
+    document.getElementById("ringing").hidden = false;
+    if (!missed) {
+      beep(); clearInterval(beepTimer);
+      let count = 0;
+      beepTimer = setInterval(() => { beep(); if (++count >= 60) stopRinging(); }, 1000);
+    }
+    if ("Notification" in window && Notification.permission === "granted") {
+      try {
+        const n = new Notification(r.label || "Alarm", {
+          body: missed ? `Missed at ${whenText(r.due)}` : (r.kind === "timer" ? "Time's up!" : "SSC alarm"),
+          tag: r.id, requireInteraction: !missed,
+        });
+        n.onclick = () => { window.focus(); n.close(); };
+      } catch {}
+    }
+    document.getElementById("stop-alarm").focus();
+  }
+  function stopRinging() {
+    clearInterval(beepTimer); beepTimer = null;
+    document.getElementById("ringing").hidden = true;
+    ringing = null;
+  }
+  // When an alarm is done: repeating ones move to their next day, the rest are removed.
+  function finish(r) {
+    if (r.repeat === "daily" || r.repeat === "weekdays") {
+      const next = new Date(r.due);
+      do { next.setDate(next.getDate() + 1); } while (r.repeat === "weekdays" && (next.getDay() === 0 || next.getDay() === 6));
+      while (next.getTime() <= Date.now()) next.setDate(next.getDate() + 1);
+      r.due = next.getTime();
+    } else {
+      day.reminders = day.reminders.filter(x => x !== r);
+    }
+    saveDay(); renderDay();
+  }
+  document.getElementById("stop-alarm").addEventListener("click", stopRinging);
+  document.getElementById("snooze-alarm").addEventListener("click", () => {
+    const r = ringing; stopRinging();
+    if (r) { day.reminders.push({...r, id: r.id + "-z" + Date.now(), due: Date.now() + 5 * 60 * 1000, repeat: "once", label: r.label}); saveDay(); renderDay(); }
+  });
+
+  // Check every second for anything due. Alarms that came due while the page was
+  // closed show as missed (no sound) if they're under 12 hours old.
+  function checkDue(firstCheck) {
+    if (ringing) return;
+    const now = Date.now();
+    const due = day.reminders.find(r => r.due <= now);
+    if (!due) return;
+    const missed = firstCheck || now - due.due > 60 * 1000;
+    if (!missed || now - due.due < 12 * 60 * 60 * 1000) ring(due, missed);
+    finish(due);
+  }
+  renderDay();
+  checkDue(true);
+  setInterval(() => checkDue(false), 1000);
+  window.addEventListener("storage", e => { if (e.key === DAY_KEY) { try { day = JSON.parse(e.newValue) || day; renderDay(); } catch {} } });
 </script>
 </body>
 </html>
