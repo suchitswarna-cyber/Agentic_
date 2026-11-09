@@ -184,6 +184,24 @@
   .day-panel li button:hover { color: var(--text); }
   .day-panel input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
   .day-panel .empty { color: var(--muted); font-size: 13px; }
+  .timer-box { border: 2px solid var(--text); border-radius: 14px; padding: 12px; box-shadow: 3px 3px 0 var(--text); }
+  .timer-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .timer-quick button { border-radius: 999px; font-size: 13px; padding: 6px 12px; }
+  form.timer-custom, form.timer-custom:focus-within {
+    display: flex; gap: 6px; margin: 0; padding: 0; max-width: none;
+    background: none; border: 0; border-radius: 0; box-shadow: none; transform: none;
+  }
+  .timer-custom input {
+    min-width: 0; flex: 1; font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--border); border-radius: 10px; padding: 7px 10px;
+  }
+  .timer-custom input:focus { outline: none; border-color: var(--text); }
+  .timer-custom input[type=number] { flex: 0 0 76px; }
+  .timer-custom button { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; border-radius: 10px; }
+  .timer-error { color: var(--error); font-size: 12px; min-height: 16px; margin-top: 6px; }
+  .countdown { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--text); }
+  #day-btn .live { font-variant-numeric: tabular-nums; font-weight: 700; margin-left: 6px; }
+  #day-btn .live:empty { display: none; }
   .day-panel .notify { margin-top: 18px; width: 100%; }
   .day-panel .note { color: var(--muted); font-size: 12px; margin-top: 14px; }
   #day-btn .count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: 4px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: var(--accent-text); font-size: 11px; font-weight: 700; }
@@ -229,7 +247,7 @@
     <div class="mode" id="mode">connecting…</div>
   </div>
   <div class="actions">
-    <button id="day-btn" type="button" aria-controls="day-panel" aria-expanded="false" title="Alarms and to-dos">⏰ My day<span class="count" id="day-count"></span></button>
+    <button id="day-btn" type="button" aria-controls="day-panel" aria-expanded="false" title="Alarms and to-dos">⏰ My day<span class="live" id="day-live" aria-live="off"></span><span class="count" id="day-count"></span></button>
     <button id="reset" type="button">New chat</button>
     <button id="signout" type="button" hidden>Sign out</button>
   </div>
@@ -239,6 +257,23 @@
   <div class="top">
     <h2>My day</h2>
     <button id="day-close" type="button" aria-label="Close">✕</button>
+  </div>
+  <h3>Timer</h3>
+  <div class="timer-box">
+    <div class="timer-quick" role="group" aria-label="Quick timers">
+      <button type="button" data-min="1">1 min</button>
+      <button type="button" data-min="5">5 min</button>
+      <button type="button" data-min="10">10 min</button>
+      <button type="button" data-min="15">15 min</button>
+      <button type="button" data-min="30">30 min</button>
+      <button type="button" data-min="60">1 hour</button>
+    </div>
+    <form class="timer-custom" id="timer-form" novalidate>
+      <input id="timer-min" type="number" min="1" max="1440" step="1" placeholder="Min" aria-label="Minutes">
+      <input id="timer-label" type="text" maxlength="60" placeholder="Label (optional)" aria-label="Timer label">
+      <button type="submit">Start</button>
+    </form>
+    <div class="timer-error" id="timer-error" role="alert"></div>
   </div>
   <h3>Alarms &amp; reminders</h3>
   <ul id="alarm-list"></ul>
@@ -588,7 +623,7 @@
     day.reminders.forEach(r => {
       const li = document.createElement("li");
       const repeat = {daily: " · every day", weekdays: " · weekdays"}[r.repeat] || "";
-      li.innerHTML = `<span aria-hidden="true">${r.kind === "timer" ? "⏳" : "⏰"}</span><span class="what"><span class="label"></span><small>${whenText(r.due)}${repeat}</small></span><button type="button" aria-label="Delete">✕</button>`;
+      li.innerHTML = `<span aria-hidden="true">${r.kind === "timer" ? "⏳" : "⏰"}</span><span class="what"><span class="label"></span><small>${r.kind === "timer" ? `<span class="countdown" data-due="${r.due}"></span> left · ` : ""}${whenText(r.due)}${repeat}</small></span><button type="button" aria-label="Delete">✕</button>`;
       li.querySelector(".label").textContent = r.label || "Alarm";
       li.querySelector("button").addEventListener("click", () => { day.reminders = day.reminders.filter(x => x !== r); saveDay(); renderDay(); });
       alarms.appendChild(li);
@@ -609,6 +644,7 @@
     const open = day.reminders.length + day.todos.filter(t => !t.done).length;
     document.getElementById("day-count").textContent = open || "";
     notifyBtn.hidden = !("Notification" in window) || Notification.permission !== "default";
+    tick();
   }
   function setPanel(open) {
     dayPanel.hidden = !open;
@@ -701,7 +737,37 @@
   }
   renderDay();
   checkDue(true);
-  setInterval(() => checkDue(false), 1000);
+  // Timers you start yourself from the My day panel.
+  function startTimer(minutes, label) {
+    day.reminders.push({id: "t" + Date.now().toString(36), kind: "timer", label: label || `${minutes} min timer`, due: Date.now() + minutes * 60 * 1000, repeat: "once"});
+    saveDay(); renderDay(); askForNotifications(); tick();
+  }
+  document.querySelectorAll(".timer-quick button").forEach(b => b.addEventListener("click", () => startTimer(Number(b.dataset.min), "")));
+  document.getElementById("timer-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const minutes = Number(document.getElementById("timer-min").value);
+    const err = document.getElementById("timer-error");
+    if (!minutes || minutes < 1 || minutes > 1440) { err.textContent = "Enter minutes between 1 and 1440."; return; }
+    err.textContent = "";
+    startTimer(minutes, document.getElementById("timer-label").value.trim());
+    document.getElementById("timer-min").value = ""; document.getElementById("timer-label").value = "";
+  });
+  document.getElementById("timer-min").addEventListener("input", () => { document.getElementById("timer-error").textContent = ""; });
+
+  // Live countdowns: each timer in the panel, and the soonest one on the My day button.
+  function left(ms) {
+    const total = Math.max(0, Math.ceil(ms / 1000));
+    const h = Math.floor(total / 3600), m = Math.floor(total % 3600 / 60), s = total % 60;
+    return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(s).padStart(2, "0");
+  }
+  function tick() {
+    const now = Date.now();
+    document.querySelectorAll(".countdown[data-due]").forEach(el => { el.textContent = left(Number(el.dataset.due) - now); });
+    const next = day.reminders.filter(r => r.kind === "timer" && r.due > now).sort((a, b) => a.due - b.due)[0];
+    document.getElementById("day-live").textContent = next ? "⏳ " + left(next.due - now) : "";
+  }
+  tick();
+  setInterval(() => { checkDue(false); tick(); }, 1000);
   window.addEventListener("storage", e => { if (e.key === DAY_KEY) { try { day = JSON.parse(e.newValue) || day; renderDay(); } catch {} } });
 </script>
 </body>
