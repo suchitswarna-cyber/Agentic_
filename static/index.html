@@ -57,22 +57,25 @@
     flex-direction: column;
   }
 
-  header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
+  header { display: flex; justify-content: center; padding: 14px 16px 4px; }
+  .toolbar {
+    display: flex; align-items: stretch; overflow: hidden;
+    background: var(--panel); border: 2px solid var(--text); border-radius: 999px;
+    box-shadow: 3px 3px 0 var(--text);
   }
-  .logo {
-    width: 34px; height: 34px; border-radius: 10px;
-    background: var(--accent); color: var(--accent-text);
-    display: grid; place-items: center; font-weight: 700;
+  .toolbar button {
+    display: inline-flex; align-items: center; gap: 7px;
+    border: 0; border-radius: 0; background: none; color: var(--text);
+    padding: 8px 15px; font-size: 13.5px; font-weight: 600; letter-spacing: .01em;
   }
-  .title { font-weight: 650; font-size: 16px; }
-  .mode { font-size: 12px; color: var(--muted); }
-  .actions { margin-left: auto; display: flex; gap: 8px; }
+  .toolbar button + button { border-left: 1.5px solid var(--border); }
+  .toolbar button:hover { background: var(--code); }
+  .toolbar button:focus-visible { outline: 2px solid var(--text); outline-offset: -4px; }
+  .toolbar svg { width: 16px; height: 16px; flex: none; }
+  @media (max-width: 560px) {
+    .toolbar .label { display: none; }
+    .toolbar button { padding: 9px 13px; }
+  }
 
   button {
     font: inherit; font-size: 14px;
@@ -200,7 +203,7 @@
   .timer-custom button { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; border-radius: 10px; }
   .timer-error { color: var(--error); font-size: 12px; min-height: 16px; margin-top: 6px; }
   .countdown { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--text); }
-  #day-btn .live { font-variant-numeric: tabular-nums; font-weight: 700; margin-left: 6px; }
+  #day-btn .live { font-variant-numeric: tabular-nums; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--code); }
   #day-btn .live:empty { display: none; }
   .day-panel .notify { margin-top: 18px; width: 100%; }
   .day-panel .note { color: var(--muted); font-size: 12px; margin-top: 14px; }
@@ -258,16 +261,17 @@
 </head>
 <body>
 <header>
-  <div class="logo">S</div>
-  <div>
-    <div class="title">SSC</div>
-    <div class="mode" id="mode">connecting…</div>
-  </div>
-  <div class="actions">
-    <button id="day-btn" type="button" aria-controls="day-panel" aria-expanded="false" title="Alarms and to-dos">⏰ My day<span class="live" id="day-live" aria-live="off"></span><span class="count" id="day-count"></span></button>
-    <button id="reset" type="button">New chat</button>
-    <button id="signout" type="button" hidden>Sign out</button>
-  </div>
+  <nav class="toolbar" aria-label="SSC">
+    <button id="day-btn" type="button" aria-controls="day-panel" aria-expanded="false" aria-label="My day" title="Alarms, timers and to-dos">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M5 3 2 6M19 3l3 3"/></svg><span class="label">My day</span><span class="live" id="day-live" aria-live="off"></span><span class="count" id="day-count"></span>
+    </button>
+    <button id="reset" type="button" aria-label="New chat" title="New chat">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span class="label">New chat</span>
+    </button>
+    <button id="signout" type="button" aria-label="Sign out" title="Sign out" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span class="label">Sign out</span>
+    </button>
+  </nav>
 </header>
 
 <aside class="day-panel" id="day-panel" aria-label="My day" hidden>
@@ -363,11 +367,8 @@
     if (r.status === 401) { location.replace("/login"); throw new Error("signed out"); }
     return r.json();
   }).then(d => {
-    document.getElementById("mode").textContent = d.mode;
     document.getElementById("signout").hidden = !d.sign_in;
-  }).catch(() => {
-    document.getElementById("mode").textContent = "server not running";
-  });
+  }).catch(() => {});
 
   function escapeHtml(s) {
     return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -818,7 +819,7 @@
     const now = Date.now();
     document.querySelectorAll(".countdown[data-due]").forEach(el => { el.textContent = left(Number(el.dataset.due) - now); });
     const next = day.reminders.filter(r => r.kind === "timer" && r.due > now).sort((a, b) => a.due - b.due)[0];
-    document.getElementById("day-live").textContent = next ? "⏳ " + left(next.due - now) : "";
+    document.getElementById("day-live").textContent = next ? left(next.due - now) : "";
   }
   tick();
   setInterval(() => { checkDue(false); tick(); }, 1000);
