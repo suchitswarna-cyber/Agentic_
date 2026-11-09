@@ -580,7 +580,7 @@
   // Greeting follows the time of day.
   function greet() {
     const h = new Date().getHours();
-    const part = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+    const part = h < 6 ? "Good night" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
     const el = document.getElementById("greeting");
     if (el) el.textContent = `${part}, Suchit`;
   }
