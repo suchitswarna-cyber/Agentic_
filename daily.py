@@ -26,19 +26,55 @@ def begin(state, now_ms, tz_offset_min) -> None:
     reminders = [r for r in state.get("reminders") or [] if isinstance(r, dict) and isinstance(r.get("due"), (int, float))]
     todos = [t for t in state.get("todos") or [] if isinstance(t, dict) and isinstance(t.get("text"), str)]
     notes = [n for n in state.get("notes") or [] if isinstance(n, dict) and isinstance(n.get("text"), str)]
+    city = state.get("city") if isinstance(state.get("city"), str) else ""
     try:
         now_ms = float(now_ms)
         tz_offset_min = int(tz_offset_min)
     except (TypeError, ValueError):
         now_ms, tz_offset_min = datetime.now(timezone.utc).timestamp() * 1000, 0
     _ctx.set({"reminders": reminders[:MAX_ITEMS], "todos": todos[:MAX_ITEMS], "notes": notes[:MAX_ITEMS],
-              "now": now_ms, "offset": tz_offset_min})
+              "city": city[:80], "now": now_ms, "offset": tz_offset_min})
 
 
 def current_state():
     """The alarms, tasks and notes to send back to the browser (None outside the web page)."""
     c = _ctx.get()
-    return None if c is None else {"reminders": c["reminders"], "todos": c["todos"], "notes": c["notes"]}
+    if c is None:
+        return None
+    return {"reminders": c["reminders"], "todos": c["todos"], "notes": c["notes"], "city": c["city"]}
+
+
+def home_city() -> str:
+    c = _ctx.get()
+    return c["city"] if c else ""
+
+
+def alarms_today() -> list:
+    """Alarms and timers due before the end of the user's day, as (time text, label)."""
+    c = _get()
+    end = _now(c).replace(hour=23, minute=59, second=59)
+    return [(_when(r["due"], c).replace(" today", ""), r.get("label", "Alarm"))
+            for r in sorted(c["reminders"], key=lambda r: r["due"]) if r["due"] <= _ms(end)]
+
+
+def open_tasks() -> list:
+    return [t["text"] for t in _get()["todos"] if not t.get("done")]
+
+
+def today_text() -> str:
+    return _now(_get()).strftime("%A, %d %B %Y").replace(" 0", " ")
+
+
+@beta_tool
+def set_home_city(city: str) -> str:
+    """Save the user's home city, used for the weather in the daily briefing.
+
+    Args:
+        city: The city, e.g. "Hyderabad".
+    """
+    c = _get()
+    c["city"] = city.strip()[:80]
+    return f"Saved your city as {c['city']}."
 
 
 def _get():
@@ -290,4 +326,4 @@ def delete_note(which: str) -> str:
 
 
 DAILY_TOOLS = [set_alarm, set_timer, list_alarms, cancel_alarm, add_task, list_tasks, complete_task, remove_task,
-               add_note, list_notes, delete_note]
+               add_note, list_notes, delete_note, set_home_city]

@@ -718,7 +718,7 @@
 
   // ---------- My day: alarms, reminders, timers and to-dos (saved in this browser) ----------
   const DAY_KEY = "ssc.day";
-  let day = {reminders: [], todos: [], notes: []};
+  let day = {reminders: [], todos: [], notes: [], city: ""};
   try { day = Object.assign(day, JSON.parse(localStorage.getItem(DAY_KEY)) || {}); } catch {}
   const dayPanel = document.getElementById("day-panel");
   const dayBtn = document.getElementById("day-btn");
@@ -741,7 +741,7 @@
   }
   function updateDay(next) {
     const before = day.reminders.length;
-    day = {reminders: next.reminders || [], todos: next.todos || [], notes: next.notes || []};
+    day = {reminders: next.reminders || [], todos: next.todos || [], notes: next.notes || [], city: next.city || day.city || ""};
     saveDay(); renderDay();
     if (day.reminders.length > before) askForNotifications();
   }
@@ -792,7 +792,30 @@
     if (open) { renderDay(); document.getElementById("day-close").focus(); }
   }
   dayBtn.addEventListener("click", () => setPanel(dayPanel.hidden));
-  document.getElementById("brief-btn").addEventListener("click", () => { setPanel(false); ask("Give me my daily briefing."); });
+  // The briefing comes straight from the server (no AI round-trips), so it's quick.
+  document.getElementById("brief-btn").addEventListener("click", async () => {
+    setPanel(false);
+    if (busy) return;
+    busy = true; send.disabled = true; send.classList.add("thinking");
+    addMessage("user", "☀️ Daily briefing");
+    const typing = addMessage("bot", '<div class="typing"><span></span><span></span><span></span></div>');
+    typing.querySelector(".bubble").style.padding = "0";
+    try {
+      const res = await fetch("/api/briefing", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({daily: day, now: Date.now(), tz_offset: new Date().getTimezoneOffset()}),
+      });
+      const data = await res.json();
+      typing.remove();
+      if (data.signed_out) { location.replace("/login"); return; }
+      if (data.answer) addReplyActions(addMessage("bot", renderMarkdown(data.answer)), data.answer);
+      else addMessage("bot error", escapeHtml(data.error || "Couldn't get your briefing. Try again."));
+    } catch {
+      typing.remove();
+      addMessage("bot error", "Can't reach SSC right now. If it was asleep, wait a minute and try again.");
+    }
+    busy = false; send.disabled = false; send.classList.remove("thinking"); input.focus();
+  });
   document.getElementById("note-form").addEventListener("submit", e => {
     e.preventDefault();
     const box = document.getElementById("note-text");

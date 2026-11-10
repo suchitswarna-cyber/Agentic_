@@ -130,9 +130,8 @@ _NEWS_TOPICS = {
 }
 
 
-@beta_tool
-def get_news(country: str = "india", topic: str = "top", count: int = 5) -> str:
-    """Get the latest news headlines for India or the USA.
+def news_text(country: str = "india", topic: str = "top", count: int = 5) -> str:
+    """Latest headlines for India or the USA, by topic, from Google News.
 
     Args:
         country: "india" or "usa".
@@ -176,6 +175,19 @@ def get_news(country: str = "india", topic: str = "top", count: int = 5) -> str:
     return f"{place} {label} headlines (via Google News):\n" + "\n".join(lines)
 
 
+@beta_tool
+def get_news(country: str = "india", topic: str = "top", count: int = 5) -> str:
+    """Get the latest news headlines for India or the USA.
+
+    Args:
+        country: "india" or "usa".
+        topic: "top" (main headlines), "current affairs" (national news), "technology",
+            "business", "world", "science", "health", "sports" or "entertainment".
+        count: How many headlines, 1 to 10.
+    """
+    return news_text(country, topic, count)
+
+
 # Open-Meteo weather codes -> plain words
 _WEATHER = {
     0: "clear sky", 1: "mainly clear", 2: "partly cloudy", 3: "overcast",
@@ -186,13 +198,8 @@ _WEATHER = {
 }
 
 
-@beta_tool
-def get_weather(city: str) -> str:
-    """Get the current weather for a city.
-
-    Args:
-        city: City name, e.g. "London" or "Hyderabad".
-    """
+def weather_text(city: str) -> str:
+    """Current weather in plain words, from Open-Meteo or (if that fails) wttr.in."""
     try:
         places = _get_json("https://geocoding-api.open-meteo.com/v1/search",
                            {"name": city, "count": 1}).get("results")
@@ -211,8 +218,29 @@ def get_weather(city: str) -> str:
             f"{now['temperature_2m']}°C (feels like {now['apparent_temperature']}°C), "
             f"humidity {now['relative_humidity_2m']}%, wind {now['wind_speed_10m']} km/h"
         )
-    except Exception as e:
-        return f"Error: {e}"
+    except Exception:
+        pass
+    # Open-Meteo often rate-limits shared hosting like Render, so fall back to wttr.in.
+    try:
+        data = _get_json(f"https://wttr.in/{urllib.parse.quote(city)}", {"format": "j1"})
+        now, area = data["current_condition"][0], data["nearest_area"][0]
+        return (
+            f"{area['areaName'][0]['value']}, {area['country'][0]['value']}: "
+            f"{now['weatherDesc'][0]['value'].strip().lower()}, {now['temp_C']}°C "
+            f"(feels like {now['FeelsLikeC']}°C), humidity {now['humidity']}%, wind {now['windspeedKmph']} km/h"
+        )
+    except Exception:
+        return "Error: the weather services are busy right now. Try again in a minute."
+
+
+@beta_tool
+def get_weather(city: str) -> str:
+    """Get the current weather for a city.
+
+    Args:
+        city: City name, e.g. "London" or "Hyderabad".
+    """
+    return weather_text(city)
 
 
 @beta_tool
@@ -297,6 +325,15 @@ def remember(key: str, value: str) -> str:
     memory[key] = value
     MEMORY_FILE.write_text(json.dumps(memory, indent=2))
     return f"Remembered {key}"
+
+
+def memory_summary() -> str:
+    """Saved facts as one line, to hand the AI up front instead of a recall round-trip."""
+    try:
+        memory = _load_memory()
+    except Exception:
+        return ""
+    return "; ".join(f"{k}: {v}" for k, v in memory.items())[:1000]
 
 
 @beta_tool

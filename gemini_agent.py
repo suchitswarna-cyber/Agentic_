@@ -6,6 +6,7 @@ until it has an answer. Gemini's free tier has daily limits.
 
 import os
 import warnings
+from concurrent.futures import ThreadPoolExecutor
 
 # The Google libraries warn loudly about this Mac's older Python; the bot works fine.
 warnings.filterwarnings("ignore", category=FutureWarning, module="google")
@@ -15,6 +16,7 @@ from google import genai  # noqa: E402
 from google.genai import errors, types  # noqa: E402,F401  (errors is used by web.py and main.py)
 
 from attachments import default_question  # noqa: E402
+from daily import DAILY_TOOLS  # noqa: E402
 from tools import LOCAL_TOOLS  # noqa: E402
 
 # Tried in order. When one is overloaded (503), out of free quota (429) or not
@@ -37,21 +39,18 @@ Work through tasks step by step. Use your tools whenever they help:
 - add_task / list_tasks / complete_task / remove_task for the user's to-do list
 - add_note / list_notes / delete_note for quick notes
 - convert_currency for money conversions (rupees are INR)
+- set_home_city when the user tells you which city they live in
 - get_news for headlines in India or the USA, by topic (top, current affairs, technology, business, ...)
 
-At the start of a conversation, call recall to see what you already know.
+The first message may include what you already know about the user in
+brackets; use it instead of calling recall.
 When you learn something lasting about the user, save it with remember.
 Alarms, reminders and to-dos live in the user's browser: set them with the
 tools, never just promise to remind the user. Each message starts with the
 user's local date and time in brackets; use it for "today", "tomorrow" and
 "in 2 hours", and don't repeat it back.
-For a daily briefing: call recall to find the user's city (if none is saved,
-ask once and save it with remember as "city"), then get_weather for it,
-list_alarms, list_tasks, and get_news four times (3 headlines each): India
-top, USA top, India current affairs, and USA technology. Reply with today's
-date, the weather, today's alarms and open to-dos, then the news under short
-headings (India, USA, Current affairs, Technology) as bullets, then one short
-motivating line. Skip a headline that already appeared under another heading.
+The daily briefing has its own button; if asked for one in chat, tell the user
+to tap Briefing at the top.
 Keep final answers clear and concise."""
 
 # Describe our tools to Gemini using the same schemas Claude sees.
@@ -60,6 +59,9 @@ _DECLARATIONS = [
     for t in LOCAL_TOOLS
 ]
 _TOOLS_BY_NAME = {t.name: t for t in LOCAL_TOOLS}
+# Alarms, to-dos and notes edit this request's state, so they stay on this thread;
+# the internet tools (weather, news, Wikipedia, ...) run side by side.
+_STATEFUL = {t.name for t in DAILY_TOOLS} | {"remember", "write_file"}
 
 
 class GeminiAgent:
@@ -96,17 +98,18 @@ class GeminiAgent:
             if not calls:
                 return _text(response) or "(no response)"
 
-            results = []
-            for call in calls:
-                name, args = call.name, dict(call.args or {})
+            jobs = [(call.name, dict(call.args or {})) for call in calls]
+            for name, args in jobs:
                 if self.on_tool_call:
                     self.on_tool_call(name, args)
-                tool = _TOOLS_BY_NAME.get(name)
-                try:
-                    result = tool.call(args) if tool else f"Error: unknown tool '{name}'"
-                except Exception as e:
-                    result = f"Error: {e}"
-                results.append(types.Part.from_function_response(name=name, response={"result": str(result)}))
+            outputs = {i: _run_tool(n, a) for i, (n, a) in enumerate(jobs) if n in _STATEFUL}
+            rest = [i for i, (n, _) in enumerate(jobs) if n not in _STATEFUL]
+            if rest:
+                with ThreadPoolExecutor(max_workers=min(8, len(rest))) as pool:
+                    for i, result in zip(rest, pool.map(lambda i: _run_tool(*jobs[i]), rest)):
+                        outputs[i] = result
+            results = [types.Part.from_function_response(name=n, response={"result": outputs[i]})
+                       for i, (n, _) in enumerate(jobs)]
             response = self._send(results)
 
         return "(stopped: too many tool steps)"
@@ -136,6 +139,14 @@ class GeminiAgent:
 
     def reset(self):
         self._start(MODELS[0])
+
+
+def _run_tool(name: str, args: dict) -> str:
+    tool = _TOOLS_BY_NAME.get(name)
+    try:
+        return str(tool.call(args)) if tool else f"Error: unknown tool '{name}'"
+    except Exception as e:
+        return f"Error: {e}"
 
 
 def _is_timeout(e) -> bool:

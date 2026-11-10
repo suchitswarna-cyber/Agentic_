@@ -17,7 +17,9 @@ from datetime import timedelta
 import anthropic
 from flask import Flask, Response, jsonify, redirect, request, send_from_directory, session
 
+import briefing
 import daily
+import tools
 from attachments import parse
 from gemini_agent import errors as genai_errors
 from providers import make_agent, provider_name
@@ -120,8 +122,16 @@ def chat():
 
     try:
         daily.begin(body.get("daily"), body.get("now"), body.get("tz_offset"))
+        context = []
         if body.get("local_time"):  # so "tomorrow" and "in 2 hours" mean the user's own time
-            message = f"[{str(body['local_time'])[:60]}] {message}".strip()
+            context.append(str(body["local_time"])[:60])
+        if not getattr(agent, "primed", False):  # saves a recall round-trip on every new chat
+            known = tools.memory_summary()
+            if known:
+                context.append(f"What you know about the user: {known}")
+            agent.primed = True
+        if context:
+            message = " ".join(f"[{c}]" for c in context) + f" {message}".rstrip()
         answer = agent.chat(message, attachments)
     except anthropic.AuthenticationError:
         return jsonify(error="Your Claude API key was rejected. Run ./add_key.sh again."), 401
@@ -143,6 +153,13 @@ def chat():
         return jsonify(error=f"Google API error {e.code}: {e.message}"), 502
 
     return jsonify(answer=answer, tools=tool_calls, daily=daily.current_state())
+
+
+@app.post("/api/briefing")
+def daily_briefing():
+    body = request.get_json(silent=True) or {}
+    daily.begin(body.get("daily"), body.get("now"), body.get("tz_offset"))
+    return jsonify(answer=briefing.build())
 
 
 @app.post("/api/reset")
