@@ -28,6 +28,7 @@ BUSY_CODES = (404, 429, 503)  # 404: that model isn't offered to this key any mo
 COOLDOWN_SECONDS = 600  # after a model fails, new chats skip it for 10 minutes
 THINKING_BUDGET = 0     # no thinking: SSC's tasks are simple lookups; None = Google's default
 _cooling = {}           # model -> time it can be tried again
+_no_thinking_cap = set()  # models that refused the thinking setting (Google says 400)
 MAX_STEPS = 10  # stop runaway tool loops
 
 SYSTEM_PROMPT = """You are SSC, a helpful autonomous assistant.
@@ -131,9 +132,10 @@ class GeminiAgent:
                 return response
             except errors.APIError as e:
                 self._note(started, f"error {e.code}")
-                if e.code == 400 and "think" in str(e).lower() and self.config.thinking_config:
-                    # This model won't take a thinking cap: drop it and try the same model again.
-                    self.config = self.config.model_copy(update={"thinking_config": None})
+                if e.code == 400 and self.model not in _no_thinking_cap and self.config.thinking_config:
+                    # Some models refuse the thinking setting (often with a vague "invalid
+                    # argument"): remember that and retry the same model without it.
+                    _no_thinking_cap.add(self.model)
                     self._start(self.model, self.session.get_history(curated=True))
                     continue
                 if e.code not in BUSY_CODES or last:
@@ -155,7 +157,10 @@ class GeminiAgent:
 
     def _start(self, model, history=None):
         self.model = model
-        self.session = self.client.chats.create(model=model, config=self.config, history=history)
+        config = self.config
+        if model in _no_thinking_cap:
+            config = config.model_copy(update={"thinking_config": None})
+        self.session = self.client.chats.create(model=model, config=config, history=history)
 
     def reset(self):
         # Start on the first model that hasn't failed in the last few minutes.
