@@ -1,4 +1,4 @@
-"""Daily helpers: alarms, reminders, timers and a to-do list.
+"""Daily helpers: alarms, reminders, timers, a to-do list and quick notes.
 
 These are kept in the user's browser, not on the server, so they survive the
 server restarting. The web page sends them along with each message (plus its
@@ -25,18 +25,20 @@ def begin(state, now_ms, tz_offset_min) -> None:
     state = state if isinstance(state, dict) else {}
     reminders = [r for r in state.get("reminders") or [] if isinstance(r, dict) and isinstance(r.get("due"), (int, float))]
     todos = [t for t in state.get("todos") or [] if isinstance(t, dict) and isinstance(t.get("text"), str)]
+    notes = [n for n in state.get("notes") or [] if isinstance(n, dict) and isinstance(n.get("text"), str)]
     try:
         now_ms = float(now_ms)
         tz_offset_min = int(tz_offset_min)
     except (TypeError, ValueError):
         now_ms, tz_offset_min = datetime.now(timezone.utc).timestamp() * 1000, 0
-    _ctx.set({"reminders": reminders[:MAX_ITEMS], "todos": todos[:MAX_ITEMS], "now": now_ms, "offset": tz_offset_min})
+    _ctx.set({"reminders": reminders[:MAX_ITEMS], "todos": todos[:MAX_ITEMS], "notes": notes[:MAX_ITEMS],
+              "now": now_ms, "offset": tz_offset_min})
 
 
 def current_state():
-    """The alarms and tasks to send back to the browser (None outside the web page)."""
+    """The alarms, tasks and notes to send back to the browser (None outside the web page)."""
     c = _ctx.get()
-    return None if c is None else {"reminders": c["reminders"], "todos": c["todos"]}
+    return None if c is None else {"reminders": c["reminders"], "todos": c["todos"], "notes": c["notes"]}
 
 
 def _get():
@@ -246,4 +248,46 @@ def remove_task(which: str) -> str:
     return "Removed: " + ", ".join(t["text"] for t in found)
 
 
-DAILY_TOOLS = [set_alarm, set_timer, list_alarms, cancel_alarm, add_task, list_tasks, complete_task, remove_task]
+@beta_tool
+def add_note(text: str) -> str:
+    """Save a quick note for the user, e.g. a password hint, a parking spot or an idea.
+
+    Args:
+        text: The note to save.
+    """
+    c = _get()
+    text = text.strip()
+    if not text:
+        return "The note is empty."
+    if len(c["notes"]) >= MAX_ITEMS:
+        return "Your notes are full. Delete some first."
+    c["notes"].insert(0, {"id": secrets.token_hex(4), "text": text[:1000], "at": int(c["now"])})
+    return f"Saved note: {text}"
+
+
+@beta_tool
+def list_notes() -> str:
+    """List the user's saved notes, newest first, numbered."""
+    c = _get()
+    if not c["notes"]:
+        return "No notes saved."
+    return "\n".join(f"{n}. {note['text']} (saved {_when(note.get('at', c['now']), c)})" for n, note in enumerate(c["notes"], 1))
+
+
+@beta_tool
+def delete_note(which: str) -> str:
+    """Delete saved notes.
+
+    Args:
+        which: The number from list_notes, words from the note, or "all".
+    """
+    c = _get()
+    found = _pick(c["notes"], which)
+    if not found:
+        return f"No note matches '{which}'. Call list_notes to see them."
+    c["notes"] = [n for n in c["notes"] if n not in found]
+    return "Deleted: " + ", ".join(n["text"][:40] for n in found)
+
+
+DAILY_TOOLS = [set_alarm, set_timer, list_alarms, cancel_alarm, add_task, list_tasks, complete_task, remove_task,
+               add_note, list_notes, delete_note]

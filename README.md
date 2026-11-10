@@ -43,6 +43,8 @@ SSC doesn't just answer — it **plans, calls tools, looks at the results, and k
 | `remember` / `recall` | Long-term memory saved to `memory.json`, kept across runs |
 | `set_alarm` / `set_timer` / `list_alarms` / `cancel_alarm` | Alarms, reminders and timers that ring (with a notification) while the SSC page is open |
 | `add_task` / `list_tasks` / `complete_task` / `remove_task` | A to-do list, also shown in the **⏰ My day** panel |
+| `add_note` / `list_notes` / `delete_note` | Quick notes, also shown (and addable) in the **My day** panel |
+| `convert_currency` | Money conversion with today's rates ([ExchangeRate-API](https://www.exchangerate-api.com), free, no key) |
 
 ## Setup
 

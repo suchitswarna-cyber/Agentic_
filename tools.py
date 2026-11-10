@@ -95,6 +95,29 @@ def _get_json(url: str, params: dict) -> dict:
         return json.loads(response.read())
 
 
+@beta_tool
+def convert_currency(amount: float, from_currency: str, to_currency: str) -> str:
+    """Convert money between currencies using today's exchange rates.
+
+    Args:
+        amount: How much money, e.g. 100.
+        from_currency: Three-letter code to convert from, e.g. "USD" (use "INR" for rupees).
+        to_currency: Three-letter code to convert to, e.g. "INR".
+    """
+    src, dst = from_currency.strip().upper(), to_currency.strip().upper()
+    try:
+        data = _get_json(f"https://open.er-api.com/v6/latest/{urllib.parse.quote(src)}", {})
+    except Exception:
+        return "Couldn't reach the exchange-rate service. Try again in a minute."
+    if data.get("result") != "success":
+        return f"'{src}' isn't a currency code I know. Use three letters like USD, INR or EUR."
+    rate = data.get("rates", {}).get(dst)
+    if rate is None:
+        return f"'{dst}' isn't a currency code I know. Use three letters like USD, INR or EUR."
+    return (f"{amount:,.2f} {src} = {amount * rate:,.2f} {dst} (1 {src} = {rate:,.4f} {dst}). "
+            f"Rates by ExchangeRate-API, updated {data.get('time_last_update_utc', 'today')[:16]}.")
+
+
 # Open-Meteo weather codes -> plain words
 _WEATHER = {
     0: "clear sky", 1: "mainly clear", 2: "partly cloudy", 3: "overcast",
@@ -239,6 +262,7 @@ LOCAL_TOOLS = [
     write_file,
     remember,
     recall,
+    convert_currency,
     *DAILY_TOOLS,
 ]
 
