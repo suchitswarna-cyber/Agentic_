@@ -26,7 +26,7 @@ from tools import LOCAL_TOOLS  # noqa: E402
 MODELS = ["gemini-flash-latest", "gemini-3.5-flash", "gemini-flash-lite-latest"]
 BUSY_CODES = (404, 429, 503)  # 404: that model isn't offered to this key any more
 COOLDOWN_SECONDS = 600  # after a model fails, new chats skip it for 10 minutes
-THINKING_BUDGET = 512   # a little thinking keeps answers quick; None = Google's default
+THINKING_BUDGET = 0     # no thinking: SSC's tasks are simple lookups; None = Google's default
 _cooling = {}           # model -> time it can be tried again
 MAX_STEPS = 10  # stop runaway tool loops
 
@@ -82,7 +82,7 @@ class GeminiAgent:
             tools=[types.Tool(function_declarations=_DECLARATIONS)],
             # We run the tools ourselves so the page can show progress and errors.
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
-            thinking_config=types.ThinkingConfig(thinking_budget=THINKING_BUDGET) if THINKING_BUDGET else None,
+            thinking_config=None if THINKING_BUDGET is None else types.ThinkingConfig(thinking_budget=THINKING_BUDGET),
         )
         self.attempts = []  # (model, seconds, outcome) for each call this turn, for /api/chat's meta
         self.on_tool_call = on_tool_call
