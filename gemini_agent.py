@@ -17,11 +17,11 @@ from google.genai import errors, types  # noqa: E402,F401  (errors is used by we
 from attachments import default_question  # noqa: E402
 from tools import LOCAL_TOOLS  # noqa: E402
 
-# Tried in order. When one is overloaded (503) or out of free quota (429), SSC
-# moves to the next. The "-latest" names follow Google's newest models, so
-# model retirements don't break SSC.
+# Tried in order. When one is overloaded (503), out of free quota (429) or not
+# offered to this key (404), SSC moves to the next. The "-latest" names follow
+# Google's newest models, so model retirements don't break SSC.
 MODELS = ["gemini-flash-latest", "gemini-3.5-flash", "gemini-flash-lite-latest"]
-BUSY_CODES = (429, 503)
+BUSY_CODES = (404, 429, 503)  # 404: that model isn't offered to this key any more
 MAX_STEPS = 10  # stop runaway tool loops
 
 SYSTEM_PROMPT = """You are SSC, a helpful autonomous assistant.
@@ -67,7 +67,10 @@ class GeminiAgent:
         self.client = genai.Client(
             api_key=os.environ["GEMINI_API_KEY"],
             # Fail within a minute instead of retrying for minutes; we switch models instead.
-            http_options=types.HttpOptions(timeout=60_000, retry_options=types.HttpRetryOptions(attempts=1)),
+            # v1beta is where the -latest model names live; fail within a minute
+            # instead of retrying for minutes, since we switch models instead.
+            http_options=types.HttpOptions(api_version="v1beta", timeout=60_000,
+                                           retry_options=types.HttpRetryOptions(attempts=1)),
         )
         self.config = types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,

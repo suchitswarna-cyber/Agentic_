@@ -1,5 +1,5 @@
 anthropic>=0.116.0
 flask>=3.0
 pypdf>=5.0
-google-genai>=1.0
+google-genai>=1.47,<2  # 2.x/3.x change the API defaults; 1.x is what SSC is tested with
 gunicorn>=22.0
