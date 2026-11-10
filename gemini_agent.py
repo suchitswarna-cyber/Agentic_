@@ -21,12 +21,17 @@ from daily import DAILY_TOOLS  # noqa: E402
 from tools import LOCAL_TOOLS  # noqa: E402
 
 # Tried in order. When one is overloaded (503), out of free quota (429) or not
-# offered to this key (404), SSC moves to the next. The "-latest" names follow
-# Google's newest models, so model retirements don't break SSC.
-MODELS = ["gemini-flash-latest", "gemini-3.5-flash", "gemini-flash-lite-latest"]
-BUSY_CODES = (404, 429, 503)  # 404: that model isn't offered to this key any more
-COOLDOWN_SECONDS = 600  # after a model fails, new chats skip it for 10 minutes
-THINKING_BUDGET = 0     # no thinking: SSC's tasks are simple lookups; None = Google's default
+# offered to this key (404), SSC moves to the next. Google's free limits are per
+# model, so more models means fewer "busy" errors. The quick "lite" models go
+# first; the "-latest" names follow Google's newest models.
+MODELS = [
+    "gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite",
+    "gemini-flash-latest", "gemini-3.5-flash", "gemini-3.8-flash",
+]
+BUSY_CODES = (404, 429, 503)
+# How long new chats skip a model after it fails, by Google's error.
+COOLDOWN = {404: 3600, 429: 60, 503: 120, "timeout": 120}
+THINKING_BUDGET = None  # Google's models here all refuse a thinking cap, so leave their default
 _cooling = {}           # model -> time it can be tried again
 _no_thinking_cap = set()  # models that refused the thinking setting (Google says 400)
 MAX_STEPS = 10  # stop runaway tool loops
@@ -132,6 +137,7 @@ class GeminiAgent:
                 return response
             except errors.APIError as e:
                 self._note(started, f"error {e.code}")
+                failure = e.code
                 if e.code == 400 and self.model not in _no_thinking_cap and self.config.thinking_config:
                     # Some models refuse the thinking setting (often with a vague "invalid
                     # argument"): remember that and retry the same model without it.
@@ -144,9 +150,10 @@ class GeminiAgent:
                 if not _is_timeout(e):
                     raise
                 self._note(started, "timeout")
+                failure = "timeout"
                 if last:
                     raise TimeoutError("Google took too long to answer. Try again in a minute.")
-            _cooling[self.model] = time.monotonic() + COOLDOWN_SECONDS
+            _cooling[self.model] = time.monotonic() + COOLDOWN.get(failure, 120)
             # A failed send isn't added to the history, so the next model
             # picks up the same conversation and the same message.
             self._start(MODELS[index + 1], self.session.get_history(curated=True))
@@ -165,7 +172,8 @@ class GeminiAgent:
     def reset(self):
         # Start on the first model that hasn't failed in the last few minutes.
         now = time.monotonic()
-        self._start(next((m for m in MODELS if _cooling.get(m, 0) <= now), MODELS[-1]))
+        ready = [m for m in MODELS if _cooling.get(m, 0) <= now]
+        self._start(ready[0] if ready else min(MODELS, key=lambda m: _cooling.get(m, 0)))
 
 
 def _run_tool(name: str, args: dict) -> str:

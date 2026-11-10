@@ -528,7 +528,8 @@
     typing.querySelector(".bubble").style.padding = "0";
 
     try {
-      const res = await fetch("/api/chat", {
+      // If SSC is restarting or waking up, the first try can fail; wait and try once more.
+      const post = () => fetch("/api/chat", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
@@ -537,6 +538,8 @@
           daily: day, now: Date.now(), tz_offset: new Date().getTimezoneOffset(), local_time: localTimeText(),
         }),
       });
+      let res;
+      try { res = await post(); } catch { await new Promise(r => setTimeout(r, 5000)); res = await post(); }
       const data = await res.json();
       typing.remove();
       if (data.signed_out) { location.replace("/login"); return; }
@@ -545,7 +548,7 @@
       else addReplyActions(addMessage("bot", renderMarkdown(data.answer)), data.answer);
     } catch {
       typing.remove();
-      addMessage("bot error", "Can't reach the SSC server. Is ./run_web.sh still running?");
+      addMessage("bot error", "Can't reach SSC right now. It may be restarting or waking up, so wait a minute and try again.");
     }
     busy = false; send.disabled = false; input.focus();
     send.classList.remove("thinking"); send.setAttribute("aria-label", "Send"); send.title = "Send";
