@@ -9,13 +9,14 @@ a sign-in screen, and a cookie keeps you signed in for 30 days.
 
 import hashlib
 import hmac
+import json
 import os
 import threading
 import time
 from datetime import timedelta
 
 import anthropic
-from flask import Flask, Response, jsonify, redirect, request, send_from_directory, session
+from flask import Flask, Response, jsonify, redirect, request, send_from_directory, session, stream_with_context
 
 import briefing
 import daily
@@ -103,59 +104,119 @@ def info():
     return jsonify(mode=MODE, sign_in=bool(PASSWORD))
 
 
-@app.post("/api/chat")
-def chat():
-    body = request.get_json(force=True)
+def _prepare(body):
+    """Check a chat request. Returns (error response, None) or (None, (agent, message, attachments, tool_calls))."""
     message = (body.get("message") or "").strip()
     try:
         attachments = [parse(a) for a in body.get("attachments") or []]
     except ValueError as e:
-        return jsonify(error=str(e)), 400
+        return (jsonify(error=str(e)), 400), None
     if not message and not attachments:
-        return jsonify(error="Empty message"), 400
+        return (jsonify(error="Empty message"), 400), None
     if MODE == "Claude" and any(a.kind == "video" for a in attachments):
-        return jsonify(error="Claude can't watch videos. Send a photo instead, or use a Google Gemini key."), 400
-
+        return (jsonify(error="Claude can't watch videos. Send a photo instead, or use a Google Gemini key."), 400), None
     agent = _get_agent(body.get("session", "default"))
     tool_calls = []
     agent.on_tool_call = lambda name, args: tool_calls.append({"name": name, "args": args})
+    return None, (agent, message, attachments, tool_calls)
 
-    try:
-        daily.begin(body.get("daily"), body.get("now"), body.get("tz_offset"))
-        context = []
-        if body.get("local_time"):  # so "tomorrow" and "in 2 hours" mean the user's own time
-            context.append(str(body["local_time"])[:60])
-        if not getattr(agent, "primed", False):  # saves a recall round-trip on every new chat
-            known = tools.memory_summary()
-            if known:
-                context.append(f"What you know about the user: {known}")
-            agent.primed = True
-        if context:
-            message = " ".join(f"[{c}]" for c in context) + f" {message}".rstrip()
-        if hasattr(agent, "attempts"):
-            agent.attempts = []
-        answer = agent.chat(message, attachments)
-    except anthropic.AuthenticationError:
-        return jsonify(error="Your Claude API key was rejected. Run ./add_key.sh again."), 401
-    except anthropic.RateLimitError:
-        return jsonify(error="Rate limited. Wait a moment and try again."), 429
-    except anthropic.APIStatusError as e:
-        return jsonify(error=f"API error {e.status_code}: {e.message}"), 502
-    except anthropic.APIConnectionError:
-        return jsonify(error="Could not reach the Claude API. Check your connection."), 502
-    except TimeoutError as e:
-        return jsonify(error=str(e)), 504
-    except genai_errors.APIError as e:
+
+def _begin_turn(agent, message, body):
+    """Load the browser's alarms and tasks, and put local time and memory in front of the message."""
+    daily.begin(body.get("daily"), body.get("now"), body.get("tz_offset"))
+    context = []
+    if body.get("local_time"):  # so "tomorrow" and "in 2 hours" mean the user's own time
+        context.append(str(body["local_time"])[:60])
+    if not getattr(agent, "primed", False):  # saves a recall round-trip on every new chat
+        known = tools.memory_summary()
+        if known:
+            context.append(f"What you know about the user: {known}")
+        agent.primed = True
+    if hasattr(agent, "attempts"):
+        agent.attempts = []
+    return " ".join(f"[{c}]" for c in context) + f" {message}".rstrip() if context else message
+
+
+def _friendly_error(e):
+    """(message, status) for errors we can explain, or None for real bugs."""
+    if isinstance(e, anthropic.AuthenticationError):
+        return "Your Claude API key was rejected. Run ./add_key.sh again.", 401
+    if isinstance(e, anthropic.RateLimitError):
+        return "Rate limited. Wait a moment and try again.", 429
+    if isinstance(e, anthropic.APIStatusError):
+        return f"API error {e.status_code}: {e.message}", 502
+    if isinstance(e, anthropic.APIConnectionError):
+        return "Could not reach the Claude API. Check your connection.", 502
+    if isinstance(e, TimeoutError):
+        return str(e), 504
+    if isinstance(e, genai_errors.APIError):
         if e.code in (400, 401, 403) and "key" in str(e).lower():
-            return jsonify(error="Your Google API key was rejected. Run ./add_key.sh again."), 401
+            return "Your Google API key was rejected. Run ./add_key.sh again.", 401
         if e.code == 429:
-            return jsonify(error="Google's free limit is used up for now. Wait a bit and try again."), 429
+            return "Google's free limit is used up for now. Wait a bit and try again.", 429
         if e.code == 503:
-            return jsonify(error="Google's Gemini models are overloaded right now. Try again in a minute."), 503
-        return jsonify(error=f"Google API error {e.code}: {e.message}"), 502
+            return "Google's Gemini models are overloaded right now. Try again in a minute.", 503
+        return f"Google API error {e.code}: {e.message}", 502
+    return None
 
-    meta = {"model": getattr(agent, "model", None), "attempts": getattr(agent, "attempts", [])}
-    return jsonify(answer=answer, tools=tool_calls, daily=daily.current_state(), meta=meta)
+
+def _meta(agent):
+    return {"model": getattr(agent, "model", None), "attempts": getattr(agent, "attempts", [])}
+
+
+@app.post("/api/chat")
+def chat():
+    body = request.get_json(force=True)
+    error, prepared = _prepare(body)
+    if error:
+        return error
+    agent, message, attachments, tool_calls = prepared
+    try:
+        answer = agent.chat(_begin_turn(agent, message, body), attachments)
+    except Exception as e:
+        friendly = _friendly_error(e)
+        if not friendly:
+            raise
+        return jsonify(error=friendly[0]), friendly[1]
+    return jsonify(answer=answer, tools=tool_calls, daily=daily.current_state(), meta=_meta(agent))
+
+
+@app.post("/api/chat/stream")
+def chat_stream():
+    """Like /api/chat, but sends the reply as it's written: one JSON object per line,
+    {"t": "delta", "text": ...} pieces, then {"t": "done", ...} or {"t": "error", ...}."""
+    body = request.get_json(force=True)
+    error, prepared = _prepare(body)
+    if error:
+        return error
+    agent, message, attachments, tool_calls = prepared
+
+    def line(obj):
+        return json.dumps(obj) + "\n"
+
+    def events():
+        # Everything happens in here, so the browser's state is loaded on the thread
+        # that actually streams the reply.
+        try:
+            turn = _begin_turn(agent, message, body)
+            if hasattr(agent, "chat_stream"):
+                pieces = []
+                for piece in agent.chat_stream(turn, attachments):
+                    pieces.append(piece)
+                    yield line({"t": "delta", "text": piece})
+                answer = "".join(pieces).strip() or "(no response)"
+            else:  # Claude: no streaming here yet, so send the whole answer at once
+                answer = agent.chat(turn, attachments)
+            yield line({"t": "done", "answer": answer, "tools": tool_calls,
+                        "daily": daily.current_state(), "meta": _meta(agent)})
+        except Exception as e:
+            friendly = _friendly_error(e)
+            if not friendly:
+                app.logger.exception("chat stream failed")
+            yield line({"t": "error", "error": friendly[0] if friendly else "Something went wrong. Try again."})
+
+    return Response(stream_with_context(events()), mimetype="application/x-ndjson",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @app.post("/api/briefing")

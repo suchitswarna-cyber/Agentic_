@@ -529,7 +529,7 @@
 
     try {
       // If SSC is restarting or waking up, the first try can fail; wait and try once more.
-      const post = () => fetch("/api/chat", {
+      const post = () => fetch("/api/chat/stream", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
@@ -540,12 +540,49 @@
       });
       let res;
       try { res = await post(); } catch { await new Promise(r => setTimeout(r, 5000)); res = await post(); }
-      const data = await res.json();
-      typing.remove();
-      if (data.signed_out) { location.replace("/login"); return; }
-      if (data.daily) updateDay(data.daily);
-      if (data.error) addMessage("bot error", escapeHtml(data.error));
-      else addReplyActions(addMessage("bot", renderMarkdown(data.answer)), data.answer);
+      if (!(res.headers.get("Content-Type") || "").includes("ndjson")) {
+        // Checks that fail before the reply starts (signed out, bad file...) come back as plain JSON.
+        const data = await res.json();
+        typing.remove();
+        if (data.signed_out) { location.replace("/login"); return; }
+        addMessage("bot error", escapeHtml(data.error || "Something went wrong. Try again."));
+      } else {
+        // The reply arrives one JSON line at a time; show the words as they come.
+        const reader = res.body.getReader(), decoder = new TextDecoder();
+        let buffer = "", sofar = "", bubble = null, finished = false;
+        const handle = event => {
+          if (event.t === "delta") {
+            sofar += event.text;
+            if (!bubble) { typing.remove(); bubble = addMessage("bot", ""); }
+            bubble.querySelector(".bubble").innerHTML = renderMarkdown(sofar);
+            if (scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 120) scroller.scrollTop = scroller.scrollHeight;
+          } else if (event.t === "done") {
+            finished = true;
+            if (event.daily) updateDay(event.daily);
+            if (!bubble) { typing.remove(); bubble = addMessage("bot", ""); }
+            bubble.querySelector(".bubble").innerHTML = renderMarkdown(event.answer);
+            addReplyActions(bubble, event.answer);
+          } else if (event.t === "error") {
+            finished = true;
+            typing.remove();
+            addMessage("bot error", escapeHtml(event.error));
+          }
+        };
+        for (;;) {
+          const {value, done} = await reader.read();
+          if (value) buffer += decoder.decode(value, {stream: true});
+          let cut;
+          while ((cut = buffer.indexOf("\n")) >= 0) {
+            const one = buffer.slice(0, cut).trim(); buffer = buffer.slice(cut + 1);
+            if (one) { try { handle(JSON.parse(one)); } catch {} }
+          }
+          if (done) break;
+        }
+        if (!finished) {
+          typing.remove();
+          addMessage("bot error", "The reply was cut off. Try again.");
+        }
+      }
     } catch {
       typing.remove();
       addMessage("bot error", "Can't reach SSC right now. It may be restarting or waking up, so wait a minute and try again.");

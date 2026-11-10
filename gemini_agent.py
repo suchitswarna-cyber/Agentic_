@@ -4,6 +4,7 @@ Same idea as agent.py: the model calls tools, sees the results, and loops
 until it has an answer. Gemini's free tier has daily limits.
 """
 
+import itertools
 import os
 import time
 import warnings
@@ -95,6 +96,10 @@ class GeminiAgent:
         self.reset()
 
     def chat(self, user_input: str, attachments=()) -> str:
+        return "".join(self.chat_stream(user_input, attachments)).strip() or "(no response)"
+
+    def chat_stream(self, user_input: str, attachments=()):
+        """Yield the reply's text in pieces as Gemini writes it, running tools in between."""
         parts = []
         for a in attachments:
             if a.kind == "text":
@@ -103,38 +108,47 @@ class GeminiAgent:
                 parts.append(types.Part.from_bytes(data=a.data, mime_type=a.mime))
         parts.append(types.Part.from_text(text=user_input or default_question(attachments)))
 
-        response = self._send(parts)
+        stream = self._send(parts)
         for _ in range(MAX_STEPS):
-            calls = response.function_calls
+            calls = []
+            for chunk in stream:
+                calls.extend(chunk.function_calls or [])
+                piece = _delta(chunk)
+                if piece:
+                    yield piece
             if not calls:
-                return _text(response) or "(no response)"
+                return
+            stream = self._send(self._run_calls(calls))
+        yield "\n\n(stopped: too many tool steps)"
 
-            jobs = [(call.name, dict(call.args or {})) for call in calls]
-            for name, args in jobs:
-                if self.on_tool_call:
-                    self.on_tool_call(name, args)
-            outputs = {i: _run_tool(n, a) for i, (n, a) in enumerate(jobs) if n in _STATEFUL}
-            rest = [i for i, (n, _) in enumerate(jobs) if n not in _STATEFUL]
-            if rest:
-                with ThreadPoolExecutor(max_workers=min(8, len(rest))) as pool:
-                    for i, result in zip(rest, pool.map(lambda i: _run_tool(*jobs[i]), rest)):
-                        outputs[i] = result
-            results = [types.Part.from_function_response(name=n, response={"result": outputs[i]})
-                       for i, (n, _) in enumerate(jobs)]
-            response = self._send(results)
-
-        return "(stopped: too many tool steps)"
+    def _run_calls(self, calls):
+        """Run the tools Gemini asked for and return their results for the next turn."""
+        jobs = [(call.name, dict(call.args or {})) for call in calls]
+        for name, args in jobs:
+            if self.on_tool_call:
+                self.on_tool_call(name, args)
+        outputs = {i: _run_tool(n, a) for i, (n, a) in enumerate(jobs) if n in _STATEFUL}
+        rest = [i for i, (n, _) in enumerate(jobs) if n not in _STATEFUL]
+        if rest:
+            with ThreadPoolExecutor(max_workers=min(8, len(rest))) as pool:
+                for i, result in zip(rest, pool.map(lambda i: _run_tool(*jobs[i]), rest)):
+                    outputs[i] = result
+        return [types.Part.from_function_response(name=n, response={"result": outputs[i]})
+                for i, (n, _) in enumerate(jobs)]
 
     def _send(self, message):
-        """Send to the current model, moving down MODELS while Google is busy."""
+        """Start a streamed reply on the current model, moving down MODELS while Google
+        is busy. Busy errors arrive with the first piece, so we read that here and can
+        still switch models before any words reach the user."""
         while True:
             index = MODELS.index(self.model)
             last = index == len(MODELS) - 1
             started = time.monotonic()
             try:
-                response = self.session.send_message(message)
+                stream = self.session.send_message_stream(message)
+                first = next(stream, None)
                 self._note(started, "ok")
-                return response
+                return itertools.chain([first] if first is not None else [], stream)
             except errors.APIError as e:
                 self._note(started, f"error {e.code}")
                 failure = e.code
@@ -189,8 +203,8 @@ def _is_timeout(e) -> bool:
     return isinstance(e, TimeoutError) or "timeout" in type(e).__name__.lower()
 
 
-def _text(response) -> str:
-    """The reply's text, skipping thinking parts (avoids a noisy SDK warning)."""
-    content = response.candidates[0].content if response.candidates else None
+def _delta(chunk) -> str:
+    """A streamed piece's text, skipping thinking parts (avoids a noisy SDK warning)."""
+    content = chunk.candidates[0].content if chunk.candidates else None
     parts = content.parts if content and content.parts else []
-    return "".join(p.text for p in parts if p.text and not p.thought).strip()
+    return "".join(p.text for p in parts if p.text and not p.thought)
