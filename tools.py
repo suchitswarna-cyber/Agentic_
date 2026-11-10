@@ -10,6 +10,8 @@ import json
 import operator
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
+from email.utils import parsedate_to_datetime
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -116,6 +118,50 @@ def convert_currency(amount: float, from_currency: str, to_currency: str) -> str
         return f"'{dst}' isn't a currency code I know. Use three letters like USD, INR or EUR."
     return (f"{amount:,.2f} {src} = {amount * rate:,.2f} {dst} (1 {src} = {rate:,.4f} {dst}). "
             f"Rates by ExchangeRate-API, updated {data.get('time_last_update_utc', 'today')[:16]}.")
+
+
+# Google News top-stories feeds, by country
+_NEWS_FEEDS = {
+    "india": "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en",
+    "usa": "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en",
+}
+_NEWS_ALIASES = {"in": "india", "bharat": "india", "us": "usa", "america": "usa", "united states": "usa"}
+
+
+@beta_tool
+def get_news(country: str = "india", count: int = 5) -> str:
+    """Get the latest top news headlines.
+
+    Args:
+        country: "india" or "usa".
+        count: How many headlines, 1 to 10.
+    """
+    key = country.strip().lower()
+    key = _NEWS_ALIASES.get(key, key)
+    if key not in _NEWS_FEEDS:
+        return "I can get news for India or the USA."
+    try:
+        request = urllib.request.Request(_NEWS_FEEDS[key], headers={"User-Agent": "Mozilla/5.0 (SSCBot)"})
+        with urllib.request.urlopen(request, timeout=10) as response:
+            root = ET.fromstring(response.read())
+    except Exception:
+        return "Couldn't reach the news service. Try again in a minute."
+    now = datetime.now().astimezone()
+    lines = []
+    for item in root.findall("./channel/item")[: max(1, min(count, 10))]:
+        title = (item.findtext("title") or "").strip()
+        source = (item.findtext("source") or "").strip()
+        if source and title.endswith(f" - {source}"):
+            title = title[: -len(source) - 3]
+        try:
+            hours = int((now - parsedate_to_datetime(item.findtext("pubDate"))).total_seconds() // 3600)
+            age = "just now" if hours < 1 else f"{hours}h ago" if hours < 48 else f"{hours // 24}d ago"
+        except Exception:
+            age = ""
+        lines.append(f"- {title} ({', '.join(x for x in (source, age) if x)})")
+    if not lines:
+        return "No headlines found right now."
+    return f"Top {key.upper() if key == 'usa' else 'India'} headlines (via Google News):\n" + "\n".join(lines)
 
 
 # Open-Meteo weather codes -> plain words
@@ -263,6 +309,7 @@ LOCAL_TOOLS = [
     remember,
     recall,
     convert_currency,
+    get_news,
     *DAILY_TOOLS,
 ]
 
