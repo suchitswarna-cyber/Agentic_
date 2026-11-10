@@ -1,0 +1,19 @@
+# Visits SSC on Render every 10 minutes so the free plan doesn't put it to
+# sleep (waking up takes about a minute). Free for public repos. GitHub may run
+# it a few minutes late, and pauses it if the repo has no activity for 60 days.
+name: Keep SSC awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Visit the sign-in page
+        run: curl -fsS -o /dev/null -m 90 -w "SSC answered %{http_code} in %{time_total}s\n" https://ssc-5j6o.onrender.com/login
