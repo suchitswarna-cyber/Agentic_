@@ -5,6 +5,7 @@ until it has an answer. Gemini's free tier has daily limits.
 """
 
 import os
+import time
 import warnings
 from concurrent.futures import ThreadPoolExecutor
 
@@ -24,6 +25,9 @@ from tools import LOCAL_TOOLS  # noqa: E402
 # Google's newest models, so model retirements don't break SSC.
 MODELS = ["gemini-flash-latest", "gemini-3.5-flash", "gemini-flash-lite-latest"]
 BUSY_CODES = (404, 429, 503)  # 404: that model isn't offered to this key any more
+COOLDOWN_SECONDS = 600  # after a model fails, new chats skip it for 10 minutes
+THINKING_BUDGET = 512   # a little thinking keeps answers quick; None = Google's default
+_cooling = {}           # model -> time it can be tried again
 MAX_STEPS = 10  # stop runaway tool loops
 
 SYSTEM_PROMPT = """You are SSC, a helpful autonomous assistant.
@@ -68,10 +72,9 @@ class GeminiAgent:
     def __init__(self, on_tool_call=None, **_):
         self.client = genai.Client(
             api_key=os.environ["GEMINI_API_KEY"],
-            # Fail within a minute instead of retrying for minutes; we switch models instead.
-            # v1beta is where the -latest model names live; fail within a minute
-            # instead of retrying for minutes, since we switch models instead.
-            http_options=types.HttpOptions(api_version="v1beta", timeout=60_000,
+            # v1beta is where the -latest model names live. Give up on a slow model
+            # after 25s instead of retrying for minutes, since we switch models instead.
+            http_options=types.HttpOptions(api_version="v1beta", timeout=25_000,
                                            retry_options=types.HttpRetryOptions(attempts=1)),
         )
         self.config = types.GenerateContentConfig(
@@ -79,7 +82,9 @@ class GeminiAgent:
             tools=[types.Tool(function_declarations=_DECLARATIONS)],
             # We run the tools ourselves so the page can show progress and errors.
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+            thinking_config=types.ThinkingConfig(thinking_budget=THINKING_BUDGET) if THINKING_BUDGET else None,
         )
+        self.attempts = []  # (model, seconds, outcome) for each call this turn, for /api/chat's meta
         self.on_tool_call = on_tool_call
         self.reset()
 
@@ -119,26 +124,43 @@ class GeminiAgent:
         while True:
             index = MODELS.index(self.model)
             last = index == len(MODELS) - 1
+            started = time.monotonic()
             try:
-                return self.session.send_message(message)
+                response = self.session.send_message(message)
+                self._note(started, "ok")
+                return response
             except errors.APIError as e:
+                self._note(started, f"error {e.code}")
+                if e.code == 400 and "think" in str(e).lower() and self.config.thinking_config:
+                    # This model won't take a thinking cap: drop it and try the same model again.
+                    self.config = self.config.model_copy(update={"thinking_config": None})
+                    self._start(self.model, self.session.get_history(curated=True))
+                    continue
                 if e.code not in BUSY_CODES or last:
                     raise
             except Exception as e:
                 if not _is_timeout(e):
                     raise
+                self._note(started, "timeout")
                 if last:
                     raise TimeoutError("Google took too long to answer. Try again in a minute.")
+            _cooling[self.model] = time.monotonic() + COOLDOWN_SECONDS
             # A failed send isn't added to the history, so the next model
             # picks up the same conversation and the same message.
             self._start(MODELS[index + 1], self.session.get_history(curated=True))
+
+    def _note(self, started, outcome):
+        self.attempts.append((self.model, round(time.monotonic() - started, 1), outcome))
+        print(f"gemini {self.model}: {outcome} in {self.attempts[-1][1]}s", flush=True)
 
     def _start(self, model, history=None):
         self.model = model
         self.session = self.client.chats.create(model=model, config=self.config, history=history)
 
     def reset(self):
-        self._start(MODELS[0])
+        # Start on the first model that hasn't failed in the last few minutes.
+        now = time.monotonic()
+        self._start(next((m for m in MODELS if _cooling.get(m, 0) <= now), MODELS[-1]))
 
 
 def _run_tool(name: str, args: dict) -> str:

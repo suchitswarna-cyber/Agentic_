@@ -132,6 +132,8 @@ def chat():
             agent.primed = True
         if context:
             message = " ".join(f"[{c}]" for c in context) + f" {message}".rstrip()
+        if hasattr(agent, "attempts"):
+            agent.attempts = []
         answer = agent.chat(message, attachments)
     except anthropic.AuthenticationError:
         return jsonify(error="Your Claude API key was rejected. Run ./add_key.sh again."), 401
@@ -152,7 +154,8 @@ def chat():
             return jsonify(error="Google's Gemini models are overloaded right now. Try again in a minute."), 503
         return jsonify(error=f"Google API error {e.code}: {e.message}"), 502
 
-    return jsonify(answer=answer, tools=tool_calls, daily=daily.current_state())
+    meta = {"model": getattr(agent, "model", None), "attempts": getattr(agent, "attempts", [])}
+    return jsonify(answer=answer, tools=tool_calls, daily=daily.current_state(), meta=meta)
 
 
 @app.post("/api/briefing")
