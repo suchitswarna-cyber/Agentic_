@@ -37,7 +37,7 @@ Work through tasks step by step. Use your tools whenever they help:
 - add_task / list_tasks / complete_task / remove_task for the user's to-do list
 - add_note / list_notes / delete_note for quick notes
 - convert_currency for money conversions (rupees are INR)
-- get_news for the latest headlines in India or the USA
+- get_news for headlines in India or the USA, by topic (top, current affairs, technology, business, ...)
 
 At the start of a conversation, call recall to see what you already know.
 When you learn something lasting about the user, save it with remember.
@@ -47,9 +47,11 @@ user's local date and time in brackets; use it for "today", "tomorrow" and
 "in 2 hours", and don't repeat it back.
 For a daily briefing: call recall to find the user's city (if none is saved,
 ask once and save it with remember as "city"), then get_weather for it,
-list_alarms, list_tasks, and get_news for "india" and for "usa" (3 each).
-Reply with today's date, the weather, today's alarms, open to-dos, the top 3
-India and top 3 USA headlines as short bullets, and one short motivating line.
+list_alarms, list_tasks, and get_news four times (3 headlines each): India
+top, USA top, India current affairs, and USA technology. Reply with today's
+date, the weather, today's alarms and open to-dos, then the news under short
+headings (India, USA, Current affairs, Technology) as bullets, then one short
+motivating line. Skip a headline that already appeared under another heading.
 Keep final answers clear and concise."""
 
 # Describe our tools to Gemini using the same schemas Claude sees.

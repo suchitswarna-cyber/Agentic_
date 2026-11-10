@@ -120,28 +120,38 @@ def convert_currency(amount: float, from_currency: str, to_currency: str) -> str
             f"Rates by ExchangeRate-API, updated {data.get('time_last_update_utc', 'today')[:16]}.")
 
 
-# Google News top-stories feeds, by country
-_NEWS_FEEDS = {
-    "india": "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en",
-    "usa": "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en",
-}
+# Google News feeds: top stories, or a topic, for each country's edition
+_NEWS_EDITIONS = {"india": "hl=en-IN&gl=IN&ceid=IN:en", "usa": "hl=en-US&gl=US&ceid=US:en"}
 _NEWS_ALIASES = {"in": "india", "bharat": "india", "us": "usa", "america": "usa", "united states": "usa"}
+_NEWS_TOPICS = {
+    "top": None, "current affairs": "NATION", "national": "NATION", "nation": "NATION",
+    "technology": "TECHNOLOGY", "tech": "TECHNOLOGY", "business": "BUSINESS", "world": "WORLD",
+    "science": "SCIENCE", "health": "HEALTH", "sports": "SPORTS", "entertainment": "ENTERTAINMENT",
+}
 
 
 @beta_tool
-def get_news(country: str = "india", count: int = 5) -> str:
-    """Get the latest top news headlines.
+def get_news(country: str = "india", topic: str = "top", count: int = 5) -> str:
+    """Get the latest news headlines for India or the USA.
 
     Args:
         country: "india" or "usa".
+        topic: "top" (main headlines), "current affairs" (national news), "technology",
+            "business", "world", "science", "health", "sports" or "entertainment".
         count: How many headlines, 1 to 10.
     """
     key = country.strip().lower()
     key = _NEWS_ALIASES.get(key, key)
-    if key not in _NEWS_FEEDS:
+    if key not in _NEWS_EDITIONS:
         return "I can get news for India or the USA."
+    subject = topic.strip().lower()
+    if subject not in _NEWS_TOPICS:
+        return "Topics I know: top, current affairs, technology, business, world, science, health, sports, entertainment."
+    section = _NEWS_TOPICS[subject]
+    url = (f"https://news.google.com/rss/headlines/section/topic/{section}?" if section
+           else "https://news.google.com/rss?") + _NEWS_EDITIONS[key]
     try:
-        request = urllib.request.Request(_NEWS_FEEDS[key], headers={"User-Agent": "Mozilla/5.0 (SSCBot)"})
+        request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (SSCBot)"})
         with urllib.request.urlopen(request, timeout=10) as response:
             root = ET.fromstring(response.read())
     except Exception:
@@ -161,7 +171,9 @@ def get_news(country: str = "india", count: int = 5) -> str:
         lines.append(f"- {title} ({', '.join(x for x in (source, age) if x)})")
     if not lines:
         return "No headlines found right now."
-    return f"Top {key.upper() if key == 'usa' else 'India'} headlines (via Google News):\n" + "\n".join(lines)
+    place = "USA" if key == "usa" else "India"
+    label = "top" if subject == "top" else subject
+    return f"{place} {label} headlines (via Google News):\n" + "\n".join(lines)
 
 
 # Open-Meteo weather codes -> plain words
