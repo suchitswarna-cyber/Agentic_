@@ -47,6 +47,21 @@ def build() -> str:
     alarms = daily.alarms_today()
     parts += [f"- {when} — {label}" for when, label in alarms] or ["No alarms today."]
 
+    dates = daily.upcoming_dates(7)
+    if dates:
+        parts += ["", "Coming up:"]
+        parts += [f"- {text}: {'today 🎉' if away == 0 else 'tomorrow' if away == 1 else f'in {away} days'}"
+                  for away, text, _ in dates]
+
+    habits = daily.habits_today()
+    if habits:
+        parts += ["", "Habits:"]
+        parts += [f"- {name}: {done:g}/{goal:g} today · {streak}-day streak" for name, done, goal, streak in habits]
+
+    spent = daily.month_spent()
+    if spent:
+        parts += ["", f"Spent this month: {daily._money(spent)}"]
+
     parts += ["", "To-do:"]
     tasks = daily.open_tasks()
     parts += [f"- {t}" for t in tasks[:8]] or ["Nothing on your list."]

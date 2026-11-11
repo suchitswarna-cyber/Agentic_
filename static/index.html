@@ -218,6 +218,10 @@
   .countdown { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--text); }
   #day-btn .live { font-variant-numeric: tabular-nums; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--code); }
   #day-btn .live:empty { display: none; }
+  .spend-total { font-weight: 700; margin: 8px 0; }
+  .habit-bar { height: 6px; border-radius: 999px; background: var(--border); margin-top: 5px; overflow: hidden; }
+  .habit-bar span { display: block; height: 100%; background: var(--text); }
+  .day-panel li button.plus { font-size: 15px; font-weight: 700; border: 1px solid var(--border); border-radius: 8px; padding: 3px 9px; }
   .day-panel .notify { margin-top: 18px; width: 100%; }
   #day-btn .count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: 4px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: var(--accent-text); font-size: 11px; font-weight: 700; }
   #day-btn .count:empty { display: none; }
@@ -301,6 +305,7 @@
       <button type="button" data-min="5">5 min</button>
       <button type="button" data-min="10">10 min</button>
       <button type="button" data-min="15">15 min</button>
+      <button type="button" data-min="25" data-label="Focus session">🎯 Focus 25</button>
       <button type="button" data-min="30">30 min</button>
       <button type="button" data-min="60">1 hour</button>
     </div>
@@ -321,6 +326,18 @@
     <button type="submit">Add</button>
   </form>
   <ul id="note-list"></ul>
+  <h3>Habits today</h3>
+  <ul id="habit-list"></ul>
+  <h3>Spending this month</h3>
+  <form class="timer-custom" id="spend-form" novalidate>
+    <input id="spend-amt" type="number" min="1" step="any" placeholder="₹" aria-label="Amount in rupees">
+    <input id="spend-what" type="text" maxlength="100" placeholder="What for?" aria-label="What it was for">
+    <button type="submit">Add</button>
+  </form>
+  <div class="spend-total" id="spend-total"></div>
+  <ul id="spend-list"></ul>
+  <h3>Coming up</h3>
+  <ul id="date-list"></ul>
   <button class="notify" id="notify-btn" type="button" hidden>🔔 Turn on notifications</button>
 </aside>
 
@@ -344,7 +361,7 @@
     <div class="welcome" id="welcome">
       <div class="eyebrow">Your Personal Assistant</div>
       <h1 id="greeting">Hello, Suchit</h1>
-      <p>I can set alarms, reminders and timers, keep your to-do list, check the weather, look things up, do maths, and read your photos, videos and files.</p>
+      <p>I can set alarms, reminders and timers, keep your to-do list, track spending and habits, remember birthdays, check the weather, convert units, look things up, and read your photos, videos and files.</p>
     </div>
   </div>
 </main>
@@ -758,7 +775,7 @@
 
   // ---------- My day: alarms, reminders, timers and to-dos (saved in this browser) ----------
   const DAY_KEY = "ssc.day";
-  let day = {reminders: [], todos: [], notes: [], city: ""};
+  let day = {reminders: [], todos: [], notes: [], expenses: [], habits: [], dates: [], city: ""};
   try { day = Object.assign(day, JSON.parse(localStorage.getItem(DAY_KEY)) || {}); } catch {}
   const dayPanel = document.getElementById("day-panel");
   const dayBtn = document.getElementById("day-btn");
@@ -781,7 +798,8 @@
   }
   function updateDay(next) {
     const before = day.reminders.length;
-    day = {reminders: next.reminders || [], todos: next.todos || [], notes: next.notes || [], city: next.city || day.city || ""};
+    day = {reminders: next.reminders || [], todos: next.todos || [], notes: next.notes || [],
+           expenses: next.expenses || [], habits: next.habits || [], dates: next.dates || [], city: next.city || day.city || ""};
     saveDay(); renderDay();
     if (day.reminders.length > before) askForNotifications();
   }
@@ -821,11 +839,86 @@
       li.querySelector("button").addEventListener("click", () => { day.notes = day.notes.filter(x => x !== n); saveDay(); renderDay(); });
       notes.appendChild(li);
     });
+    renderExtras();
     const open = day.reminders.length + day.todos.filter(t => !t.done).length;
     document.getElementById("day-count").textContent = open || "";
     notifyBtn.hidden = !("Notification" in window) || Notification.permission !== "default";
     tick();
   }
+  function todayKey() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  const rupees = n => "₹" + Number(n).toLocaleString("en-IN", {maximumFractionDigits: 2});
+  function deleteButton(onClick, label = "Delete") {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = "✕"; b.setAttribute("aria-label", label);
+    b.addEventListener("click", () => { onClick(); saveDay(); renderDay(); });
+    return b;
+  }
+  function renderExtras() {
+    day.expenses = day.expenses || []; day.habits = day.habits || []; day.dates = day.dates || [];
+    // Habits: today's count against the goal, with a + to add one.
+    const habits = document.getElementById("habit-list");
+    habits.innerHTML = day.habits.length ? "" : '<li class="empty">Say "track water, goal 8 glasses" to start a habit.</li>';
+    const key = todayKey();
+    day.habits.forEach(h => {
+      h.log = h.log || {};
+      const done = h.log[key] || 0, goal = h.goal || 1;
+      const li = document.createElement("li");
+      li.innerHTML = `<span class="what"><span class="label"></span><small></small><div class="habit-bar"><span></span></div></span><button type="button" class="plus">+1</button>`;
+      li.querySelector(".label").textContent = h.name;
+      li.querySelector("small").textContent = `${done}/${goal} today${done >= goal ? " · done ✓" : ""}`;
+      li.querySelector(".habit-bar span").style.width = Math.min(100, done / goal * 100) + "%";
+      const plus = li.querySelector(".plus");
+      plus.setAttribute("aria-label", `Add one to ${h.name}`);
+      plus.addEventListener("click", () => { h.log[key] = (h.log[key] || 0) + 1; saveDay(); renderDay(); });
+      li.appendChild(deleteButton(() => { day.habits = day.habits.filter(x => x !== h); }, `Stop tracking ${h.name}`));
+      habits.appendChild(li);
+    });
+    // Spending this month.
+    const start = new Date(); start.setDate(1); start.setHours(0, 0, 0, 0);
+    const month = day.expenses.filter(x => (x.at || 0) >= start.getTime());
+    const total = month.reduce((sum, x) => sum + x.amount, 0);
+    document.getElementById("spend-total").textContent = month.length ? `${rupees(total)} spent this month` : "";
+    const spends = document.getElementById("spend-list");
+    spends.innerHTML = month.length ? "" : '<li class="empty">Nothing logged this month.</li>';
+    month.slice(-5).reverse().forEach(x => {
+      const li = document.createElement("li");
+      li.innerHTML = `<span class="what"><span class="label"></span><small></small></span>`;
+      li.querySelector(".label").textContent = `${rupees(x.amount)} · ${x.what}`;
+      li.querySelector("small").textContent = `${x.category || "Other"} · ${new Date(x.at).toLocaleDateString([], {day: "numeric", month: "short"})}`;
+      li.appendChild(deleteButton(() => { day.expenses = day.expenses.filter(e => e !== x); }));
+      spends.appendChild(li);
+    });
+    // Birthdays, anniversaries and events in the next 30 days.
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const soon = day.dates.map(d => {
+      let when = new Date(today.getFullYear(), d.month - 1, d.day);
+      if (when < today) when = new Date(today.getFullYear() + 1, d.month - 1, d.day);
+      return {d, when, away: Math.round((when - today) / 86400000)};
+    }).filter(x => x.away <= 30).sort((a, b) => a.away - b.away);
+    const dates = document.getElementById("date-list");
+    dates.innerHTML = soon.length ? "" : `<li class="empty">${day.dates.length ? "Nothing in the next 30 days." : 'Say "Mom\'s birthday is 14 March" to save one.'}</li>`;
+    soon.forEach(({d, when, away}) => {
+      const li = document.createElement("li");
+      const icon = {birthday: "🎂", anniversary: "💍"}[d.kind] || "📅";
+      li.innerHTML = `<span aria-hidden="true">${icon}</span><span class="what"><span class="label"></span><small></small></span>`;
+      li.querySelector(".label").textContent = d.kind === "event" ? d.name : `${d.name}'s ${d.kind}`;
+      li.querySelector("small").textContent = `${when.toLocaleDateString([], {day: "numeric", month: "short"})} · ${away === 0 ? "today 🎉" : away === 1 ? "tomorrow" : `in ${away} days`}`;
+      li.appendChild(deleteButton(() => { day.dates = day.dates.filter(x => x !== d); }));
+      dates.appendChild(li);
+    });
+  }
+  document.getElementById("spend-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const amt = document.getElementById("spend-amt"), what = document.getElementById("spend-what");
+    const amount = Number(amt.value);
+    if (!(amount > 0)) { amt.focus(); return; }
+    day.expenses = day.expenses || [];
+    day.expenses.push({id: "e" + Date.now().toString(36), amount, what: what.value.trim() || "Other", category: "Other", at: Date.now()});
+    amt.value = ""; what.value = ""; saveDay(); renderDay();
+  });
   function setPanel(open) {
     dayPanel.hidden = !open;
     dayBtn.setAttribute("aria-expanded", String(open));
@@ -955,7 +1048,7 @@
     day.reminders.push({id: "t" + Date.now().toString(36), kind: "timer", label: label || `${minutes} min timer`, due: Date.now() + minutes * 60 * 1000, repeat: "once"});
     saveDay(); renderDay(); askForNotifications(); tick();
   }
-  document.querySelectorAll(".timer-quick button").forEach(b => b.addEventListener("click", () => startTimer(Number(b.dataset.min), "")));
+  document.querySelectorAll(".timer-quick button").forEach(b => b.addEventListener("click", () => startTimer(Number(b.dataset.min), b.dataset.label || "")));
   document.getElementById("timer-form").addEventListener("submit", e => {
     e.preventDefault();
     const minutes = Number(document.getElementById("timer-min").value);

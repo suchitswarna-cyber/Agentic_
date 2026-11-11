@@ -343,6 +343,71 @@ def recall() -> str:
     return json.dumps(memory, indent=2) if memory else "(memory is empty)"
 
 
+# --- Unit converter ---------------------------------------------------------
+
+# Each unit as (kind, how many of the base unit it is). Base units: metre, kilogram,
+# litre, square metre, metre/second, byte, second.
+_UNITS = {
+    "mm": ("length", 0.001), "cm": ("length", 0.01), "m": ("length", 1), "km": ("length", 1000),
+    "in": ("length", 0.0254), "ft": ("length", 0.3048), "yd": ("length", 0.9144), "mi": ("length", 1609.344),
+    "mg": ("mass", 1e-6), "g": ("mass", 0.001), "kg": ("mass", 1), "t": ("mass", 1000),
+    "oz": ("mass", 0.028349523125), "lb": ("mass", 0.45359237),
+    "ml": ("volume", 0.001), "l": ("volume", 1), "tsp": ("volume", 0.00492892), "tbsp": ("volume", 0.0147868),
+    "cup": ("volume", 0.24), "floz": ("volume", 0.0295735), "gal": ("volume", 3.78541),
+    "sqft": ("area", 0.09290304), "sqm": ("area", 1), "acre": ("area", 4046.8564224), "hectare": ("area", 10000),
+    "sqkm": ("area", 1e6), "sqyd": ("area", 0.83612736),
+    "kmh": ("speed", 1 / 3.6), "mph": ("speed", 0.44704), "ms": ("speed", 1), "knot": ("speed", 0.514444),
+    "b": ("data", 1), "kb": ("data", 1024), "mb": ("data", 1024 ** 2), "gb": ("data", 1024 ** 3), "tb": ("data", 1024 ** 4),
+    "sec": ("time", 1), "min": ("time", 60), "hr": ("time", 3600), "day": ("time", 86400), "week": ("time", 604800),
+}
+_ALIASES = {
+    "millimetre": "mm", "millimeter": "mm", "centimetre": "cm", "centimeter": "cm", "metre": "m", "meter": "m",
+    "kilometre": "km", "kilometer": "km", "inch": "in", "inches": "in", "foot": "ft", "feet": "ft", "yard": "yd",
+    "mile": "mi", "miles": "mi", "gram": "g", "kilogram": "kg", "kilo": "kg", "kgs": "kg", "tonne": "t", "ton": "t",
+    "ounce": "oz", "pound": "lb", "lbs": "lb", "litre": "l", "liter": "l", "millilitre": "ml", "milliliter": "ml",
+    "teaspoon": "tsp", "tablespoon": "tbsp", "gallon": "gal", "sq ft": "sqft", "square feet": "sqft",
+    "square foot": "sqft", "sq m": "sqm", "square metre": "sqm", "square meter": "sqm", "acres": "acre",
+    "hectares": "hectare", "ha": "hectare", "sq km": "sqkm", "sq yd": "sqyd", "square yard": "sqyd", "gaj": "sqyd",
+    "km/h": "kmh", "kph": "kmh", "m/s": "ms", "knots": "knot", "byte": "b", "bytes": "b",
+    "second": "sec", "seconds": "sec", "s": "sec", "minute": "min", "minutes": "min", "mins": "min",
+    "hour": "hr", "hours": "hr", "h": "hr", "days": "day", "weeks": "week",
+}
+_TEMPS = {"c": "c", "celsius": "c", "°c": "c", "f": "f", "fahrenheit": "f", "°f": "f", "k": "k", "kelvin": "k"}
+
+
+def _unit(name: str) -> str:
+    n = name.strip().lower().replace("²", "").rstrip(".")
+    return _ALIASES.get(n) or _ALIASES.get(n.rstrip("s")) or (n if n in _UNITS else n.rstrip("s"))
+
+
+@beta_tool
+def convert_units(value: float, from_unit: str, to_unit: str) -> str:
+    """Convert between units: length, weight, volume, area, speed, data size, time and temperature.
+
+    Examples: 5 km to miles, 70 kg to lb, 100 F to C, 2 acres to sqft, 1.5 cup to ml.
+
+    Args:
+        value: The number to convert.
+        from_unit: The unit it's in, e.g. "km", "lb", "F", "sqft".
+        to_unit: The unit wanted, e.g. "mi", "kg", "C", "sqm".
+    """
+    a, b = from_unit.strip().lower(), to_unit.strip().lower()
+    if a in _TEMPS and b in _TEMPS:
+        a, b = _TEMPS[a], _TEMPS[b]
+        c = {"c": value, "f": (value - 32) * 5 / 9, "k": value - 273.15}[a]
+        out = {"c": c, "f": c * 9 / 5 + 32, "k": c + 273.15}[b]
+        return f"{value:g} °{a.upper()} = {out:.2f} °{b.upper()}".replace("°K", "K")
+    ua, ub = _unit(a), _unit(b)
+    if ua not in _UNITS or ub not in _UNITS:
+        missing = from_unit if ua not in _UNITS else to_unit
+        return f"I don't know the unit '{missing}'."
+    (ka, fa), (kb, fb) = _UNITS[ua], _UNITS[ub]
+    if ka != kb:
+        return f"Can't convert {ka} ({from_unit}) to {kb} ({to_unit})."
+    out = value * fa / fb
+    return f"{value:g} {from_unit} = {out:,.6g} {to_unit}"
+
+
 # Server-side tool: runs on Anthropic's infrastructure, no local code needed.
 WEB_SEARCH = {"type": "web_search_20260209", "name": "web_search", "max_uses": 5}
 
@@ -359,6 +424,7 @@ LOCAL_TOOLS = [
     recall,
     convert_currency,
     get_news,
+    convert_units,
     *DAILY_TOOLS,
 ]
 
